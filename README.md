@@ -95,13 +95,13 @@ For `CallContract`, you will have to look through the ABI's of all the diffrent 
 
 Following code generates script to transfer `tokenAmount` amount of token `tokenSymbol` from wallet `from` to wallet `to`
 ```
-from := "put sender address here" // Phantasma address, starting with capital 'P'
-to := "put recepient address here" // Phantasma address, starting with capital 'P'
+from, _ := cryptography.FromString("put sender address here") // Phantasma address, starting with capital 'P'
+to, _ := cryptography.FromString("put recepient address here") // Phantasma address, starting with capital 'P'
 tokenAmount := big.NewInt(1000000000) // Token amount in the form of big integer
 tokenSymbol := "SOUL"
 
 sb := scriptbuilder.BeginScript()
-script := sb.CallContract("gas", "AllowGas", from, cryptography.NullAddress().String(), big.NewInt(100000), big.NewInt(21000)).
+script := sb.CallContract("gas", "AllowGas", from, cryptography.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
     CallInterop("Runtime.TransferTokens", from, to, tokenSymbol, tokenAmount).
     CallContract("gas", "SpendGas", from).
     EndScript()
@@ -110,11 +110,11 @@ script := sb.CallContract("gas", "AllowGas", from, cryptography.NullAddress().St
 And here we generate script to make a call which does not require transaction, for this we use `CallContract` method:
 
 ```
-address := "put caller address here" // Phantasma address, starting with capital 'P'
+address, _ := cryptography.FromString("put caller address here") // Phantasma address, starting with capital 'P'
 tokenAmount := big.NewInt(1000000000) // Token amount in the form of big integer
 
 sb := scriptbuilder.BeginScript().
-    CallContract("gas", "AllowGas", address, cryptography.NullAddress().String(), big.NewInt(100000), big.NewInt(21000)).
+    CallContract("gas", "AllowGas", address, cryptography.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
     CallContract("stake", "Stake", address, tokenAmount).
     CallContract("gas", "SpendGas", address)
 script := sb.EndScript()
@@ -125,31 +125,31 @@ script := sb.EndScript()
 For some widely used contract calls SDK has special extension methods which make code more compact. Here's the list of available extensions:
 
 ```
-func (s ScriptBuilder) AllowGas(from, to string, gasPrice, gasLimit *big.Int)
+func (s ScriptBuilder) AllowGas(from, to cryptography.Address, gasPrice, gasLimit *big.Int)
 ```
 
 ```
-func (s ScriptBuilder) SpendGas(address string)
+func (s ScriptBuilder) SpendGas(address cryptography.Address)
 ```
 
 ```
-func (s ScriptBuilder) MintTokens(symbol, from, to string, amount *big.Int)
+func (s ScriptBuilder) MintTokens(symbol string, from, to cryptography.Address, amount *big.Int)
 ```
 
 ```
-func (s ScriptBuilder) Stake(address string, amount *big.Int)
+func (s ScriptBuilder) Stake(address cryptography.Address, amount *big.Int)
 ```
 
 ```
-func (s ScriptBuilder) Unstake(address string, amount *big.Int)
+func (s ScriptBuilder) Unstake(address cryptography.Address, amount *big.Int)
 ```
 
 ```
-func (s ScriptBuilder) TransferTokens(symbol, from, to string, amount *big.Int)
+func (s ScriptBuilder) TransferTokens(symbol string, from, to cryptography.Address, amount *big.Int)
 ```
 
 ```
-func (s ScriptBuilder) TransferBalance(symbol, from, to string)
+func (s ScriptBuilder) TransferBalance(symbol string, from, to cryptography.Address)
 ```
 
 ### Examples
@@ -158,14 +158,14 @@ We can rewrite examples from previous section using `AllowGas()` and `SpendGas()
 
 ```
 sb := scriptbuilder.BeginScript()
-script := sb.AllowGas(from, cryptography.NullAddress().String(), big.NewInt(100000), big.NewInt(21000)).
+script := sb.AllowGas(from, cryptography.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
     CallInterop("Runtime.TransferTokens", from, to, tokenSymbol, tokenAmount).
     SpendGas(from).
     EndScript()
 ```
 ```
 sb := scriptbuilder.BeginScript().
-    AllowGas(address, crypto.NullAddress().String(), big.NewInt(100000), big.NewInt(21000)).
+    AllowGas(address, crypto.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
     CallContract("stake", "Stake", address, tokenAmount).
     SpendGas(address)
 script := sb.EndScript()
@@ -175,14 +175,14 @@ We can also rewrite main contract calls in these examples:
 
 ```
 sb := scriptbuilder.BeginScript()
-script := sb.AllowGas(from, cryptography.NullAddress().String(), big.NewInt(100000), big.NewInt(21000)).
-    TransferTokens(from, to, tokenSymbol, tokenAmount).
+script := sb.AllowGas(from, cryptography.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
+    TransferTokens(tokenSymbol, from, to, tokenAmount).
     SpendGas(from).
     EndScript()
 ```
 ```
 sb := scriptbuilder.BeginScript().
-    AllowGas(address, crypto.NullAddress().String(), big.NewInt(100000), big.NewInt(21000)).
+    AllowGas(address, crypto.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
     Stake(address, tokenAmount).
     SpendGas(address)
 script := sb.EndScript()
@@ -225,9 +225,9 @@ Note, building a transaction is for transactional scripts only. Non transactiona
 ```
 // Build script
 sb := scriptbuilder.BeginScript()
-script := sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), big.NewInt(100000), big.NewInt(21000)).
-    TransferTokens(tokenSymbol, keyPair.Address().String(), to, tokenAmount).
-    SpendGas(keyPair.Address().String()).
+script := sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
+    TransferTokens(tokenSymbol, keyPair.Address(), to, tokenAmount).
+    SpendGas(keyPair.Address()).
     EndScript()
 
 // Build transaction
@@ -286,7 +286,7 @@ Following code shows how to stake SOUL token:
 ```
 // Build script
 sb := scriptbuilder.BeginScript().
-    AllowGas(address, crypto.NullAddress().String(), big.NewInt(100000), big.NewInt(21000)).
+    AllowGas(address, crypto.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
     Stake(address, tokenAmount).
     SpendGas(address)
 script := sb.EndScript()
