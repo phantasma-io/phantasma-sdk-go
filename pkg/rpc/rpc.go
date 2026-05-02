@@ -1,10 +1,9 @@
 package rpc
 
 import (
-	"fmt"
-	"math/big"
-
 	"context"
+	"errors"
+	"math/big"
 
 	"github.com/phantasma-io/phantasma-go/pkg/jsonrpc"
 	resp "github.com/phantasma-io/phantasma-go/pkg/rpc/response"
@@ -51,13 +50,17 @@ func NewRPC(endpoint string) PhantasmaRPC {
 	return rpc
 }
 
-func checkError(err error, rpcError *jsonrpc.RPCError) error {
+func checkError(result *jsonrpc.RPCResponse, err error) error {
 	if err != nil {
 		return err
 	}
 
-	if rpcError != nil {
-		return fmt.Errorf(rpcError.Message)
+	if result == nil {
+		return errors.New("rpc response missing")
+	}
+
+	if result.Error != nil {
+		return errors.New(result.Error.Message)
 	}
 
 	return nil
@@ -68,7 +71,7 @@ func (rpc PhantasmaRPC) GetPlatforms() ([]resp.PlatformResult, error) {
 	var platforms []resp.PlatformResult
 	result, err := rpc.client.Call(context.Background(), "getPlatforms", nil)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return []resp.PlatformResult{}, err
 	}
 
@@ -85,7 +88,7 @@ func (rpc PhantasmaRPC) GetAccounts(addresses string) ([]resp.AccountResult, err
 	var accounts []resp.AccountResult
 	result, err := rpc.client.Call(context.Background(), "getAccounts", addresses, false)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return []resp.AccountResult{}, err
 	}
 
@@ -102,7 +105,7 @@ func (rpc PhantasmaRPC) LookupName(name string) (string, error) {
 	var address string
 	result, err := rpc.client.Call(context.Background(), "getAccount", address, false)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return "", err
 	}
 
@@ -119,7 +122,7 @@ func (rpc PhantasmaRPC) GetAccount(address string) (resp.AccountResult, error) {
 	var account resp.AccountResult
 	result, err := rpc.client.Call(context.Background(), "getAccount", address, false)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return resp.AccountResult{}, err
 	}
 
@@ -137,7 +140,7 @@ func (rpc PhantasmaRPC) GetAccountEx(address string) (resp.AccountResult, error)
 	var account resp.AccountResult
 	result, err := rpc.client.Call(context.Background(), "getAccount", address, true)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return resp.AccountResult{}, err
 	}
 
@@ -155,7 +158,7 @@ func (rpc PhantasmaRPC) GetAddressTransactions(address string, page int, pageSiz
 	var addressTxs resp.PaginatedResult[resp.AddressTransactionsResult]
 	result, err := rpc.client.Call(context.Background(), "getAddressTransactions", address, page, pageSize)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return resp.PaginatedResult[resp.AddressTransactionsResult]{}, err
 	}
 
@@ -172,7 +175,7 @@ func (rpc PhantasmaRPC) GetAddressTransactionCount(address string, chainName str
 	var count int
 	result, err := rpc.client.Call(context.Background(), "getAddressTransactionCount", address, chainName)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return 0, err
 	}
 
@@ -189,7 +192,7 @@ func (rpc PhantasmaRPC) GetBlockByHeight(chain string, height string) (resp.Bloc
 	var blockResult resp.BlockResult
 	result, err := rpc.client.Call(context.Background(), "getBlockByHeight", chain, height)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return resp.BlockResult{}, err
 	}
 
@@ -201,7 +204,7 @@ func (rpc PhantasmaRPC) GetBlockByHeight(chain string, height string) (resp.Bloc
 			return blockResult, err
 		}
 
-		return blockResult, fmt.Errorf(errorResult.Error)
+		return blockResult, errors.New(errorResult.Error)
 	}
 	return blockResult, nil
 }
@@ -211,7 +214,7 @@ func (rpc PhantasmaRPC) GetBlockHeight(chainName string) (*big.Int, error) {
 	var resultValue string
 	result, err := rpc.client.Call(context.Background(), "getBlockHeight", chainName)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return big.NewInt(0), err
 	}
 
@@ -228,7 +231,7 @@ func (rpc PhantasmaRPC) GetContract(name, chainName string) (resp.ContractResult
 	var contract resp.ContractResult
 	result, err := rpc.client.Call(context.Background(), "getContract", chainName, name)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return resp.ContractResult{}, err
 	}
 
@@ -245,7 +248,7 @@ func (rpc PhantasmaRPC) InvokeRawScript(chain, script string) (resp.ScriptResult
 	scriptResult := resp.ScriptResult{}
 	result, err := rpc.client.Call(context.Background(), "invokeRawScript", chain, script)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return resp.ScriptResult{}, err
 	}
 
@@ -257,7 +260,7 @@ func (rpc PhantasmaRPC) InvokeRawScript(chain, script string) (resp.ScriptResult
 			return scriptResult, err
 		}
 
-		return scriptResult, fmt.Errorf(errorResult.Error)
+		return scriptResult, errors.New(errorResult.Error)
 	}
 
 	return scriptResult, nil
@@ -268,7 +271,7 @@ func (rpc PhantasmaRPC) SendRawTransaction(txData string) (string, error) {
 	var hash string
 	result, err := rpc.client.Call(context.Background(), "sendRawTransaction", txData)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return "", err
 	}
 
@@ -280,7 +283,7 @@ func (rpc PhantasmaRPC) SendRawTransaction(txData string) (string, error) {
 			return hash, err
 		}
 
-		return hash, fmt.Errorf(errorResult.Error)
+		return hash, errors.New(errorResult.Error)
 	}
 
 	return hash, nil
@@ -291,7 +294,7 @@ func (rpc PhantasmaRPC) GetTransaction(txHash string) (resp.TransactionResult, e
 	var txResult resp.TransactionResult
 	result, err := rpc.client.Call(context.Background(), "getTransaction", txHash)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return resp.TransactionResult{}, err
 	}
 
@@ -303,7 +306,7 @@ func (rpc PhantasmaRPC) GetTransaction(txHash string) (resp.TransactionResult, e
 			return txResult, err
 		}
 
-		return txResult, fmt.Errorf(errorResult.Error)
+		return txResult, errors.New(errorResult.Error)
 	}
 	return txResult, nil
 }
@@ -313,7 +316,7 @@ func (rpc PhantasmaRPC) GetTokens(extended bool) ([]resp.TokenResult, error) {
 	var txResult []resp.TokenResult
 	result, err := rpc.client.Call(context.Background(), "getTokens", extended)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return []resp.TokenResult{}, err
 	}
 
@@ -325,7 +328,7 @@ func (rpc PhantasmaRPC) GetTokens(extended bool) ([]resp.TokenResult, error) {
 			return txResult, err
 		}
 
-		return txResult, fmt.Errorf(errorResult.Error)
+		return txResult, errors.New(errorResult.Error)
 	}
 	return txResult, nil
 }
@@ -351,7 +354,7 @@ func (rpc PhantasmaRPC) GetToken(symbol string, extended bool) (resp.TokenResult
 	var txResult resp.TokenResult
 	result, err := rpc.client.Call(context.Background(), "getToken", symbol, extended)
 
-	if err := checkError(err, result.Error); err != nil {
+	if err := checkError(result, err); err != nil {
 		return resp.TokenResult{}, err
 	}
 
@@ -363,7 +366,7 @@ func (rpc PhantasmaRPC) GetToken(symbol string, extended bool) (resp.TokenResult
 			return txResult, err
 		}
 
-		return txResult, fmt.Errorf(errorResult.Error)
+		return txResult, errors.New(errorResult.Error)
 	}
 	return txResult, nil
 }
