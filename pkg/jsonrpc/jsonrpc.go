@@ -185,6 +185,82 @@ type RPCRequest struct {
 	JSONRPC string      `json:"jsonrpc"`
 }
 
+// rpcResponseID is the wire representation of a JSON-RPC response id. This
+// client uses numeric ids, but serializes requests as strings and Phantasma RPC
+// echoes that string value back.
+type rpcResponseID int
+
+func (id *rpcResponseID) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if bytes.Equal(data, []byte("null")) {
+		*id = 0
+		return nil
+	}
+
+	var numericID int
+	if err := json.Unmarshal(data, &numericID); err == nil {
+		*id = rpcResponseID(numericID)
+		return nil
+	}
+
+	var stringID string
+	if err := json.Unmarshal(data, &stringID); err != nil {
+		return fmt.Errorf("could not parse rpc response id: %w", err)
+	}
+
+	numericID, err := strconv.Atoi(stringID)
+	if err != nil {
+		return fmt.Errorf("could not parse rpc response id %q: %w", stringID, err)
+	}
+
+	*id = rpcResponseID(numericID)
+	return nil
+}
+
+type rpcResponseWire struct {
+	JSONRPC string        `json:"jsonrpc"`
+	Result  interface{}   `json:"result,omitempty"`
+	Error   *RPCError     `json:"error,omitempty"`
+	ID      rpcResponseID `json:"id"`
+}
+
+func (response *rpcResponseWire) toRPCResponse() *RPCResponse {
+	if response == nil {
+		return nil
+	}
+
+	return &RPCResponse{
+		JSONRPC: response.JSONRPC,
+		Result:  response.Result,
+		Error:   response.Error,
+		ID:      int(response.ID),
+	}
+}
+
+func decodeRPCResponse(decoder *json.Decoder) (*RPCResponse, error) {
+	var response *rpcResponseWire
+	err := decoder.Decode(&response)
+	return response.toRPCResponse(), err
+}
+
+func decodeRPCResponses(decoder *json.Decoder) (RPCResponses, error) {
+	var responseWires []*rpcResponseWire
+	if err := decoder.Decode(&responseWires); err != nil {
+		return nil, err
+	}
+
+	if responseWires == nil {
+		return nil, nil
+	}
+
+	responses := make(RPCResponses, len(responseWires))
+	for i, responseWire := range responseWires {
+		responses[i] = responseWire.toRPCResponse()
+	}
+
+	return responses, nil
+}
+
 // NewRequest returns a new RPCRequest that can be created using the same convenient parameter syntax as Call()
 //
 // Default RPCRequest id is 0. If you want to use an id other than 0, use NewRequestWithID() or set the ID field of the returned RPCRequest manually.
@@ -462,13 +538,12 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 	}
 	defer httpResponse.Body.Close()
 
-	var rpcResponse *RPCResponse
 	decoder := json.NewDecoder(httpResponse.Body)
 	if !client.allowUnknownFields {
 		decoder.DisallowUnknownFields()
 	}
 	decoder.UseNumber()
-	err = decoder.Decode(&rpcResponse)
+	rpcResponse, err := decodeRPCResponse(decoder)
 
 	// parsing error
 	if err != nil {
@@ -522,13 +597,12 @@ func (client *rpcClient) doBatchCall(ctx context.Context, rpcRequest []*RPCReque
 	}
 	defer httpResponse.Body.Close()
 
-	var rpcResponses RPCResponses
 	decoder := json.NewDecoder(httpResponse.Body)
 	if !client.allowUnknownFields {
 		decoder.DisallowUnknownFields()
 	}
 	decoder.UseNumber()
-	err = decoder.Decode(&rpcResponses)
+	rpcResponses, err := decodeRPCResponses(decoder)
 
 	// parsing error
 	if err != nil {
@@ -552,6 +626,12 @@ func (client *rpcClient) doBatchCall(ctx context.Context, rpcRequest []*RPCReque
 			}
 		}
 		return nil, fmt.Errorf("rpc batch call on %v status code: %v. rpc response missing", httpRequest.URL.Redacted(), httpResponse.StatusCode)
+	}
+
+	for i, rpcResponse := range rpcResponses {
+		if rpcResponse == nil {
+			return nil, fmt.Errorf("rpc batch call on %v status code: %v. rpc response %v missing", httpRequest.URL.Redacted(), httpResponse.StatusCode, i)
+		}
 	}
 
 	// if we have a response body, but also a http error, return both
