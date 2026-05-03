@@ -1,8 +1,8 @@
 module github.com/phantasma-io/phantasma-go
 
-go 1.22
+go 1.25
 
-toolchain go1.23.1
+toolchain go1.26.2
 
 require (
 	github.com/dustinxie/ecc v0.0.0-20210511000915-959544187564

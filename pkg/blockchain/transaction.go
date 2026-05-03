@@ -3,7 +3,6 @@ package blockchain
 import (
 	"strings"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
 	crypto "github.com/phantasma-io/phantasma-go/pkg/cryptography"
 	"github.com/phantasma-io/phantasma-go/pkg/io"
 	hashing "github.com/phantasma-io/phantasma-go/pkg/util/hashing"
@@ -50,7 +49,7 @@ func NewTransaction(nexusName, chainName string, script []byte, timestamp uint32
 func (tx *Transaction) updateHash() {
 	data := tx.BytesEx(false)
 	bytes := hashing.Sha256(data)
-	hash, err := cryptography.HashFromBytes(bytes)
+	hash, err := crypto.HashFromBytes(bytes)
 	if err != nil {
 		panic("Updating hash on tx failed!")
 	}
@@ -70,11 +69,17 @@ func (tx *Transaction) SerializeEx(writer *io.BinWriter, withSignatures bool) {
 	writer.WriteVarBytes(tx.Payload)
 
 	if withSignatures {
-		writer.WriteVarUint(uint64(len(tx.Signatures)))
+		signatureCount := 0
 		for _, signature := range tx.Signatures {
+			if signature != nil {
+				signatureCount++
+			}
+		}
 
+		writer.WriteVarUint(uint64(signatureCount))
+		for _, signature := range tx.Signatures {
 			if signature == nil {
-				writer.WriteB(byte(cryptography.None)) // signaturekind.none
+				continue
 			}
 			writer.WriteB(byte(signature.Kind()))
 			signature.Serialize(writer)
@@ -154,9 +159,6 @@ func (tx *Transaction) IsSignedBy(addresses []crypto.Address) bool {
 
 // Mine the transaction with the passed in difficulty
 func (tx *Transaction) Mine(difficulty int) {
-
-	//TODO checks
-
 	if difficulty == 0 {
 		return
 	}
@@ -197,6 +199,3 @@ func TxStateIsFault(state string) bool {
 		return false
 	}
 }
-
-// TODO
-//func (tx *Transaction) IsValid(chain Chain) {}

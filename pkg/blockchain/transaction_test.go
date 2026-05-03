@@ -83,5 +83,13 @@ func TestTxSerialization2(t *testing.T) {
 	assert.Equal(t, tx, newTx)
 }
 
-//TODO
-//func TestTxMine(t *testing.T) {}
+func TestTxSerializationSkipsNilSignatures(t *testing.T) {
+	tx := NewTransaction("mainnet", "main", []byte{0x01, 0x02, 0x03}, 1623519055, nil)
+	tx.Signatures = []cryptography.Signature{nil}
+
+	assert.NotPanics(t, func() {
+		bytes := io.Serialize(&tx)
+		newTx := io.Deserialize[*Transaction](bytes)
+		assert.Empty(t, newTx.Signatures)
+	})
+}

@@ -32,10 +32,7 @@ func (s *TokenSeries) Serialize(writer *io.BinWriter) {
 	writer.WriteB(byte(s.Mode))
 	writer.WriteVarBytes(s.Script)
 
-	// TODO this is how it should have been done for ABI
-	// But it's incompatible with current storage
-	// s.ABI.Serialize(writer)
-
+	// Chain storage wraps the ABI bytes in a var-bytes field.
 	bytes := io.Serialize[*ContractInterface](&s.ABI)
 	writer.WriteVarBytes(bytes)
 
@@ -48,11 +45,7 @@ func (s *TokenSeries) Deserialize(reader *io.BinReader) {
 	s.Mode = TokenSeriesMode(reader.ReadB())
 	s.Script = reader.ReadVarBytes()
 
-	// TODO this is how it should have been done for ABI
-	// This length byte was stored but we don't really need it
-	// s.ABI = ContractInterface{}
-	// s.ABI.Deserialize(reader)
-
+	// Chain storage wraps the ABI bytes in a var-bytes field.
 	bytes := reader.ReadVarBytes()
 	s.ABI = *io.Deserialize[*ContractInterface](bytes)
 
@@ -78,10 +71,7 @@ func (s *TokenSeries_S) Serialize(writer *io.BinWriter) {
 	writer.WriteB(byte(s.Mode))
 	writer.WriteVarBytes(s.Script)
 
-	// TODO this is how it should have been done for ABI
-	// But it's incompatible with current storage
-	// s.ABI.Serialize(writer)
-
+	// Chain storage wraps the ABI bytes in a var-bytes field.
 	bytes := io.Serialize[*ContractInterface](&s.ABI)
 	writer.WriteVarBytes(bytes)
 
@@ -94,11 +84,7 @@ func (s *TokenSeries_S) Deserialize(reader *io.BinReader) {
 	s.Mode = TokenSeriesMode(reader.ReadB())
 	s.Script = reader.ReadVarBytes()
 
-	// TODO this is how it should have been done for ABI
-	// This length byte was stored but we don't really need it
-	// s.ABI = ContractInterface{}
-	// s.ABI.Deserialize(reader)
-
+	// Chain storage wraps the ABI bytes in a var-bytes field.
 	bytes := reader.ReadVarBytes()
 	s.ABI = *io.Deserialize[*ContractInterface](bytes)
 

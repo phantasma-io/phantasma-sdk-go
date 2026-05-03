@@ -9,7 +9,7 @@ import (
 	"github.com/phantasma-io/phantasma-go/pkg/util"
 )
 
-// Adds extra byte prefix to signify that this is an uncompressed key
+// UncompressedPublicKeyTo65Bytes returns pubkey with the uncompressed-key prefix.
 func UncompressedPublicKeyTo65Bytes(pubkey []byte) []byte {
 	if len(pubkey) == 65 {
 		return util.ArrayClone(pubkey)
@@ -35,6 +35,9 @@ func PrivateKeyUnmarshal(privKey []byte, curve elliptic.Curve) *ecdsa.PrivateKey
 	pk := new(ecdsa.PrivateKey)
 	pk.Curve = curve
 	pk.D = new(big.Int).SetBytes(privKey)
+	// Go's ECDSA implementation expects the public affine point to be populated on private keys.
+	//lint:ignore SA1019 secp256k1 support still depends on the elliptic-compatible dustinxie/ecc curve.
+	pk.X, pk.Y = curve.ScalarBaseMult(privKey)
 
 	return pk
 }

@@ -1,7 +1,6 @@
 package io
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -10,7 +9,7 @@ import (
 )
 
 func TestMakeDirForFile_HappyPath(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "test")
+	tempDir, err := os.MkdirTemp("", "test")
 	require.NoError(t, err)
 
 	filePath := tempDir + "/testDir/testFile.test"
@@ -28,8 +27,9 @@ func removeDir(t *testing.T, dirName string) {
 }
 
 func TestMakeDirForFile_Negative(t *testing.T) {
-	file, err := ioutil.TempFile("", "test")
+	file, err := os.CreateTemp("", "test")
 	require.NoError(t, err)
+	require.NoError(t, file.Close())
 
 	filePath := file.Name() + "/error"
 	dir := path.Dir(filePath)

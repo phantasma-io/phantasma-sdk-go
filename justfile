@@ -6,6 +6,12 @@ just:
 guide:
     cat README.md | less
 
+[group('format')]
+f:
+    find . -type f -name '*.go' -not -path './.git/*' -not -path './pkg/util/bigint_test_data.go' -exec gofmt -w {} +
+
+format: f
+
 [group('build')]
 build:
     go build ./...

@@ -17,6 +17,8 @@ This project aims to be an easy to use SDK for the Phantasma blockchain.
 
 ## Installation
 
+Requires Go 1.25 or newer. The module is developed with the Go 1.26 toolchain.
+
 PhantasmaGo is distributed as a library that includes all the functionality provided.
 
 ```
@@ -40,7 +42,7 @@ To create a new key pair structure from private key in WIF format use following 
 ```
 keyPair, err := cryptography.FromWIF("put WIF here")
 if err != nil {
-    panic("Creating keyPair failed!")
+    log.Fatalf("creating key pair: %v", err)
 }
 ```
 
@@ -49,23 +51,29 @@ To get detailed description of tokens deployed on the chain you can use followin
 ```
 var chainTokens []response.TokenResult
 
-func getChainToken(symbol string) response.TokenResult {
+func getChainToken(symbol string) (response.TokenResult, bool) {
     for _, t := range chainTokens {
         if t.Symbol == symbol {
-            return t
+            return t, true
         }
     }
 
-    panic("Token not found")
+    return response.TokenResult{}, false
 }
 
-chainTokens, _ = client.GetTokens(false)
+chainTokens, err = client.GetTokens(false)
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 This will allow you to get token characteristics this way:
 
 ```
-t := getChainToken("SOUL")
+t, ok := getChainToken("SOUL")
+if !ok {
+    log.Fatal("token SOUL not found")
+}
 if t.IsFungible() {
     fmt.Println("Token SOUL is fungible")
 }
@@ -73,30 +81,107 @@ if t.IsFungible() {
 
 Code samples in the following sections of this documentation use `client` and `keyPair` structures and method `getChainToken` which should be initialized in advance.
 
+## Carbon transactions and token builders
+
+The SDK includes `pkg/carbon` for Phantasma Phoenix Carbon transaction serialization and token-module calls. This package mirrors the C#/TS/C++ SDK model:
+
+- fixed-width Carbon types: `Bytes16`, `Bytes32`, `Bytes64`, `SmallString`, `IntX`;
+- `TxMsg`, `SignedTxMsg`, witnesses, call sections, and trade payloads;
+- VM schema structures used by token metadata;
+- token-module argument/result blobs for create token, create series, mint, transfer, burn and metadata update calls;
+- high-level helpers for token metadata, NFT ROM/RAM, standard NFT schemas, transaction signing, and NFT address/instance-id conversion.
+
+Example: build and sign a Carbon NFT mint transaction:
+
+```go
+signer, err := cryptography.FromWIF("put WIF here")
+if err != nil {
+    log.Fatal(err)
+}
+
+receiver, err := carbon.Bytes32FromPhantasmaAddressText("put receiver address here")
+if err != nil {
+    log.Fatal(err)
+}
+
+schemas := carbon.PrepareStandardTokenSchemas(false)
+rom, err := carbon.BuildNFTRom(schemas.ROM, big.NewInt(1), []carbon.MetadataField{
+    {Name: "name", Value: "Example NFT"},
+    {Name: "description", Value: "Minted with phantasma-go Carbon helpers"},
+    {Name: "imageURL", Value: "https://example.com/nft.png"},
+    {Name: "infoURL", Value: "https://example.com/nft"},
+    {Name: "royalties", Value: int32(0)},
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+signedTx, err := carbon.BuildMintNonFungibleTxAndSignHex(
+    42,                 // Carbon token id
+    1,                  // Carbon series id
+    signer,
+    receiver,
+    rom,
+    nil,                // RAM
+    carbon.DefaultMintNFTFeeOptions(),
+    100_000_000,
+    time.Now().UTC().Add(20*time.Minute).UnixMilli(),
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+txHash, err := client.SendCarbonTransaction(signedTx)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println("Carbon tx hash:", txHash)
+```
+
+See `docs/carbon.md` for the package-level API map.
+Carbon `Build...` helpers return validation errors for user input; `MustBuild...` variants are available only when panic-on-invalid-input is intentional.
+
+## Carbon RPC wrappers
+
+The RPC client now exposes the Carbon endpoints used by the current C#/TS SDKs. Important additions include:
+
+- chain/block lookup: `GetChains`, `GetChain`, `GetNexus`, `GetBlockByHash`, `GetLatestBlock`, `GetTransactionByBlockHashAndIndex`;
+- contract/organization lookup: `GetContracts`, `GetContractByName`, `GetContractByAddress`, `GetOrganization`, `GetOrganizationByName`, `GetOrganizations`;
+- Carbon token views: `GetTokensByOwner`, `GetTokenWithID`, `GetTokenSeries`, `GetTokenSeriesByID`, `GetTokenNFTs`, `GetAccountFungibleTokens`, `GetAccountNFTs`, `GetAccountOwnedTokens`, `GetAccountOwnedTokenSeries`;
+- archive and auction helpers: `GetArchive`, `ReadArchive`, `WriteArchive`, `GetAuctionsCount`, `GetAuctions`, `GetAuction`;
+- transaction broadcast: `SendCarbonTransaction`, `SignAndSendCarbonTransaction`.
+
+Cursor-paginated endpoints return `response.CursorPaginatedResult[T]`.
+Carbon token id filters use `uint64`, Carbon series id filters use `uint32`, and `0` means no Carbon id filter. `GetTokenNFTsWithSeriesID` accepts the Phantasma Series ID string filter exposed by current RPC nodes.
+Use `client.CallContext(ctx, method, params...)` for low-level calls that need request cancellation or deadlines.
+
 ## Script Builder
 
-Building a script is the most important part of interacting with the Phantasma blockchain. Without a propper script, the Phantasma blockchain will not know what you are trying to do.
+Building a script is the most important part of interacting with the Phantasma blockchain. Without a proper script, the Phantasma blockchain will not know what you are trying to do.
 
 These functions, `CallContract` and `CallInterop`, are your bread and butter for creating new scripts.
 
 ```
-func (s ScriptBuilder) CallContract(contractName, method string, args ...interface{})
+func (s ScriptBuilder) CallContract(contractName, method string, args ...interface{}) ScriptBuilder
 ```
 
 ```
-func (s ScriptBuilder) CallInterop(method string, args ...interface{})
+func (s ScriptBuilder) CallInterop(method string, args ...interface{}) ScriptBuilder
 ```
 
-You can find out all the diffrent `CallInterop` functions below.
+You can find out all the different `CallInterop` functions below.
 
-For `CallContract`, you will have to look through the ABI's of all the diffrent smart contracts currently deployed on the Phantasma 'mainnet': [Link Here](https://explorer.phantasma.info/en/nexus?tab=contracts). To see all methods of a contract, for example `stake`, you can check it with explorer: [Link Here](https://explorer.phantasma.info/en/contract?id=stake&tab=methods).
+For `CallContract`, you will have to look through the ABI's of all the different smart contracts currently deployed on the Phantasma 'mainnet': [Link Here](https://explorer.phantasma.info/en/nexus?tab=contracts). To see all methods of a contract, for example `stake`, you can check it with explorer: [Link Here](https://explorer.phantasma.info/en/contract?id=stake&tab=methods).
+
+The Go builder now resolves labels per instance, emits integer values as VM `Number` payloads, supports array arguments, and matches the C#/TS/C++ shared script vectors.
+Address arguments are intentionally typed as `cryptography.Address` in high-level helpers. Raw `string` arguments passed to `CallContract` or `CallInterop` are emitted as VM strings; use `cryptography.MustAddressFromString(text)` or the `*Text` helpers when the ABI expects a Phantasma address.
 
 ### Examples
 
 Following code generates script to transfer `tokenAmount` amount of token `tokenSymbol` from wallet `from` to wallet `to`
 ```
-from, _ := cryptography.FromString("put sender address here") // Phantasma address, starting with capital 'P'
-to, _ := cryptography.FromString("put recepient address here") // Phantasma address, starting with capital 'P'
+from := cryptography.MustAddressFromString("put sender address here") // Phantasma address, starting with capital 'P'
+to := cryptography.MustAddressFromString("put recipient address here") // Phantasma address, starting with capital 'P'
 tokenAmount := big.NewInt(1000000000) // Token amount in the form of big integer
 tokenSymbol := "SOUL"
 
@@ -110,7 +195,7 @@ script := sb.CallContract("gas", "AllowGas", from, cryptography.NullAddress(), b
 And here we generate script to make a call which does not require transaction, for this we use `CallContract` method:
 
 ```
-address, _ := cryptography.FromString("put caller address here") // Phantasma address, starting with capital 'P'
+address := cryptography.MustAddressFromString("put caller address here") // Phantasma address, starting with capital 'P'
 tokenAmount := big.NewInt(1000000000) // Token amount in the form of big integer
 
 sb := scriptbuilder.BeginScript().
@@ -122,35 +207,11 @@ script := sb.EndScript()
 
 ## Script Builder Extensions
 
-For some widely used contract calls SDK has special extension methods which make code more compact. Here's the list of available extensions:
+For some widely used contract calls SDK has special extension methods which make code more compact. The typed-address helpers are `AllowGas`, `SpendGas`, `MintTokens`, `Stake`, `Unstake`, `TransferTokens`, `TransferBalance`, `TransferNFT`, `CrossTransferToken`, `CrossTransferNFT`, and `CallNFT`.
 
-```
-func (s ScriptBuilder) AllowGas(from, to cryptography.Address, gasPrice, gasLimit *big.Int)
-```
+String-address convenience helpers are `AllowGasText`, `SpendGasText`, `MintTokensText`, `StakeText`, `UnstakeText`, `TransferTokensText`, `TransferBalanceText`, `TransferNFTText`, `CrossTransferTokenText`, and `CrossTransferNFTText`.
 
-```
-func (s ScriptBuilder) SpendGas(address cryptography.Address)
-```
-
-```
-func (s ScriptBuilder) MintTokens(symbol string, from, to cryptography.Address, amount *big.Int)
-```
-
-```
-func (s ScriptBuilder) Stake(address cryptography.Address, amount *big.Int)
-```
-
-```
-func (s ScriptBuilder) Unstake(address cryptography.Address, amount *big.Int)
-```
-
-```
-func (s ScriptBuilder) TransferTokens(symbol string, from, to cryptography.Address, amount *big.Int)
-```
-
-```
-func (s ScriptBuilder) TransferBalance(symbol string, from, to cryptography.Address)
-```
+The ordinary `*Text` helpers parse Phantasma address text before emitting VM address bytes. Cross-chain text helpers parse the Phantasma destination-chain/sender addresses and keep the destination account as a VM string for non-Phantasma destination formats.
 
 ### Examples
 
@@ -165,7 +226,7 @@ script := sb.AllowGas(from, cryptography.NullAddress(), big.NewInt(100000), big.
 ```
 ```
 sb := scriptbuilder.BeginScript().
-    AllowGas(address, crypto.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
+    AllowGas(address, cryptography.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
     CallContract("stake", "Stake", address, tokenAmount).
     SpendGas(address)
 script := sb.EndScript()
@@ -182,7 +243,7 @@ script := sb.AllowGas(from, cryptography.NullAddress(), big.NewInt(100000), big.
 ```
 ```
 sb := scriptbuilder.BeginScript().
-    AllowGas(address, crypto.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
+    AllowGas(address, cryptography.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
     Stake(address, tokenAmount).
     SpendGas(address)
 script := sb.EndScript()
@@ -207,12 +268,16 @@ encodedScript := hex.EncodeToString(script)
 result, err := client.InvokeRawScript("main", encodedScript)
 
 if err != nil {
-    panic("Script invocation failed! Error: " + err.Error())
+    log.Fatalf("script invocation failed: %v", err)
 }
 
-// `DecodeResult()` decodes HEX-encoded byte array result, stored in `.Result` field, into `vm.VMObject` structure
+// `DecodeResultWithError()` decodes HEX-encoded byte array result, stored in `.Result` field, into `vm.VMObject` structure
 // `AsNumber()` returns value stored in `vm.VMObject` structure, in `.Data` field, as a *big.Int number (in our case value is stored in `vm.VMObject` as big integer serialized into byte array)
-fmt.Println("Current SoulMasters count: ", result.DecodeResult().AsNumber().String())
+value, err := result.DecodeResultWithError()
+if err != nil {
+    log.Fatalf("script result decoding failed: %v", err)
+}
+fmt.Println("Current SoulMasters count: ", value.AsNumber().String())
 ```
 
 ## Building and sending transaction
@@ -248,10 +313,10 @@ Here we send transaction prepared in previous block of code and stored as HEX in
 ```
 txHash, err := client.SendRawTransaction(txHex)
 if err != nil {
-    panic("Broadcasting tx failed! Error: " + err.Error())
+    log.Fatalf("broadcasting tx failed: %v", err)
 } else {
     if util.ErrorDetect(txHash) {
-        panic("Broadcasting tx failed! Error: " + txHash)
+        log.Fatalf("broadcasting tx failed: %s", txHash)
     } else {
         fmt.Println("Tx successfully broadcasted! Tx hash: " + txHash)
     }
@@ -286,7 +351,7 @@ Following code shows how to stake SOUL token:
 ```
 // Build script
 sb := scriptbuilder.BeginScript().
-    AllowGas(address, crypto.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
+    AllowGas(address, cryptography.NullAddress(), big.NewInt(100000), big.NewInt(21000)).
     Stake(address, tokenAmount).
     SpendGas(address)
 script := sb.EndScript()
@@ -303,10 +368,10 @@ txHex := hex.EncodeToString(tx.Bytes())
 
 txHash, err := client.SendRawTransaction(txHex)
 if err != nil {
-    panic("Broadcasting tx failed! Error: " + err.Error())
+    log.Fatalf("broadcasting tx failed: %v", err)
 } else {
     if util.ErrorDetect(txHash) {
-        panic("Broadcasting tx failed! Error: " + txHash)
+        log.Fatalf("broadcasting tx failed: %s", txHash)
     } else {
         fmt.Println("Tx successfully broadcasted! Tx hash: " + txHash)
     }
@@ -345,7 +410,7 @@ func waitForIncomingTransfers(address string) {
         // Get block's data by its height
         block, err := client.GetBlockByHeight("main", height.String())
         if err != nil {
-            panic("GetBlockByHeight call failed! Error: " + err.Error())
+            log.Fatalf("GetBlockByHeight failed: %v", err)
         }
 
         // Iterate throough all transactions in the block
@@ -366,7 +431,10 @@ func waitForIncomingTransfers(address string) {
                     data := io.Deserialize[*event.TokenEventData](decoded, &event.TokenEventData{})
 
                     // Apply decimals to the token amount
-                    t := getChainToken(data.Symbol)
+                    t, ok := getChainToken(data.Symbol)
+                    if !ok {
+                        log.Fatalf("token %s not found", data.Symbol)
+                    }
                     tokenAmount := util.ConvertDecimals(data.Value, int(t.Decimals))
 
                     // Call our callback function

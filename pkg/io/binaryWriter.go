@@ -177,7 +177,7 @@ func (w *BinWriter) WriteTimestamp(t *types.Timestamp) {
 
 // WriteVarBytes writes a variable length byte array into the underlying io.Writer.
 func (w *BinWriter) WriteVarBytes(b []byte) {
-	if b == nil || len(b) == 0 {
+	if len(b) == 0 {
 		w.WriteVarUint(uint64(0))
 		return
 	}

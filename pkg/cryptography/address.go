@@ -27,10 +27,8 @@ const (
 	Interop AddressKind = 0x03
 )
 
-// Address struct
+// Address stores the binary and text forms of a Phantasma address.
 type Address struct {
-
-	// Code to run in PhantasmaVM for this transaction.
 	data []byte
 	text string
 	kind AddressKind
@@ -88,7 +86,7 @@ func FromString(s string) (Address, error) {
 
 	s = strings.TrimSpace(s)
 	if len(s) < 2 {
-		return Address{}, fmt.Errorf("Invalid address string: empty or too short")
+		return Address{}, fmt.Errorf("invalid address string: empty or too short")
 	}
 
 	data, err := base58.Decode(s[1:])
@@ -101,31 +99,36 @@ func FromString(s string) (Address, error) {
 	switch prefix := s[:1]; prefix {
 	case "P":
 		if address.Kind() != User {
-			return Address{}, fmt.Errorf("Address has to be of type User")
+			return Address{}, fmt.Errorf("address has to be of type User")
 		}
 	case "X":
 		if address.Kind() != Interop {
-			return Address{}, fmt.Errorf("Address has to be of type Interop")
+			return Address{}, fmt.Errorf("address has to be of type Interop")
 		}
 	case "S":
 		if address.Kind() != System {
-			return Address{}, fmt.Errorf("Address has to be of type System")
+			return Address{}, fmt.Errorf("address has to be of type System")
 		}
 	default:
-		return Address{}, fmt.Errorf("Unknown address prefix: " + prefix)
+		return Address{}, fmt.Errorf("unknown address prefix: %s", prefix)
 	}
 
 	return address, nil
 }
 
+// MustAddressFromString parses a Phantasma address and panics on invalid input.
+func MustAddressFromString(s string) Address {
+	address, err := FromString(s)
+	if err != nil {
+		panic(err)
+	}
+	return address
+}
+
 // IsValidAddress verifies if a string is a valid address
 func IsValidAddress(text string) bool {
 	_, err := FromString(text)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 // IsUser verifies if the passed in address is a user address
@@ -160,11 +163,7 @@ func (a Address) IsNull() bool {
 	}
 
 	empty := make([]byte, Length)
-	if !bytes.Equal(a.data, empty) {
-		return false
-	}
-
-	return true
+	return bytes.Equal(a.data, empty)
 }
 
 // Kind returns the kind of an address

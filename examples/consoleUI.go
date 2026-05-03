@@ -3,11 +3,31 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"strconv"
 	"strings"
 )
+
+var consoleReader = bufio.NewReader(os.Stdin)
+
+func readConsoleLine(reader *bufio.Reader) (string, bool) {
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		if err == io.EOF && line != "" {
+			return strings.TrimRight(line, "\r\n"), true
+		}
+		return "", false
+	}
+
+	return strings.TrimRight(line, "\r\n"), true
+}
+
+func exitOnClosedInput() {
+	fmt.Println()
+	os.Exit(0)
+}
 
 func PromptIndexedMenu(title string, items []string) (int, string) {
 	if title != "" {
@@ -22,13 +42,13 @@ func PromptIndexedMenu(title string, items []string) (int, string) {
 		}
 	}
 
-	reader := bufio.NewReader(os.Stdin)
-
 	menuIndex := 0
 	for {
 		fmt.Print("Enter menu index: ")
-		menuIndexStr, _ := reader.ReadString('\n')
-		menuIndexStr = strings.TrimSuffix(menuIndexStr, "\n")
+		menuIndexStr, ok := readConsoleLine(consoleReader)
+		if !ok {
+			exitOnClosedInput()
+		}
 		menuIndex, _ = strconv.Atoi(menuIndexStr)
 
 		if menuIndex >= 1 && menuIndex <= len(items) {
@@ -39,12 +59,12 @@ func PromptIndexedMenu(title string, items []string) (int, string) {
 }
 
 func PromptYNChoice(message string) bool {
-	reader := bufio.NewReader(os.Stdin)
-
 	for {
 		fmt.Print(message, " Please enter 'y' or 'n': ")
-		choiceYN, _ := reader.ReadString('\n')
-		choiceYN = strings.TrimSuffix(choiceYN, "\n")
+		choiceYN, ok := readConsoleLine(consoleReader)
+		if !ok {
+			exitOnClosedInput()
+		}
 		if strings.ToLower(choiceYN) == "n" {
 			return false
 		}
@@ -56,12 +76,12 @@ func PromptYNChoice(message string) bool {
 }
 
 func PromptIntInput(message string, minValue int, maxValue int) int {
-	reader := bufio.NewReader(os.Stdin)
-
 	for {
 		fmt.Printf("%s [%d-%d]: ", message, minValue, maxValue)
-		inputStr, _ := reader.ReadString('\n')
-		inputStr = strings.TrimSuffix(inputStr, "\n")
+		inputStr, ok := readConsoleLine(consoleReader)
+		if !ok {
+			exitOnClosedInput()
+		}
 		input, _ := strconv.Atoi(inputStr)
 
 		if input < minValue || input > maxValue {
@@ -73,13 +93,17 @@ func PromptIntInput(message string, minValue int, maxValue int) int {
 }
 
 func PromptBigFloatInput(message string, minValue *big.Float, maxValue *big.Float) (*big.Float, string) {
-	reader := bufio.NewReader(os.Stdin)
-
 	for {
 		fmt.Printf("%s [%s-%s]: ", message, minValue.String(), maxValue.String())
-		inputStr, _ := reader.ReadString('\n')
-		inputStr = strings.TrimSuffix(inputStr, "\n")
-		input, _ := big.NewFloat(0).SetString(inputStr)
+		inputStr, ok := readConsoleLine(consoleReader)
+		if !ok {
+			exitOnClosedInput()
+		}
+		input, ok := big.NewFloat(0).SetString(inputStr)
+		if !ok {
+			fmt.Printf("Entered value '%s' is not a valid number\n", inputStr)
+			continue
+		}
 
 		if input.Cmp(minValue) == -1 || input.Cmp(maxValue) == 1 {
 			fmt.Printf("Entered value '%s' is out of range [%s-%s]\n", input.String(), minValue.String(), maxValue.String())
@@ -90,11 +114,11 @@ func PromptBigFloatInput(message string, minValue *big.Float, maxValue *big.Floa
 }
 
 func PromptStringInput(message string) string {
-	reader := bufio.NewReader(os.Stdin)
-
 	fmt.Print(message)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSuffix(input, "\n")
+	input, ok := readConsoleLine(consoleReader)
+	if !ok {
+		exitOnClosedInput()
+	}
 
 	return input
 }

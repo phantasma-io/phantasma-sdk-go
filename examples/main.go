@@ -13,12 +13,6 @@ var netSelected string
 var client rpc.PhantasmaRPC
 var chainTokens []response.TokenResult
 
-func printTokens() {
-	for _, t := range chainTokens {
-		fmt.Println(t.Symbol, "flags:", t.Flags)
-	}
-}
-
 func getChainToken(symbol string) response.TokenResult {
 	for _, t := range chainTokens {
 		if t.Symbol == symbol {
@@ -114,7 +108,6 @@ func main() {
 	chainTokens, _ = client.GetTokens(false)
 	fmt.Println("Received information about", len(chainTokens), netSelected, "tokens")
 
-	// printTokens()
 	// t := getChainToken("SOUL")
 	// fmt.Println(t.Symbol, "fungible:", t.IsFungible(), "fuel:", t.IsFuel(), "stakable:", t.IsStakable(), "burnable:", t.IsBurnable(), "transferable:", t.IsTransferable())
 	// t = getChainToken("CROWN")

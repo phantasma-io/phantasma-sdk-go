@@ -96,22 +96,22 @@ func (k PhantasmaKeys) WIF() string {
 	return string(encoded)
 }
 
-//ExpandedPrivateKey returns the associated expanded private key
+// ExpandedPrivateKey returns the associated expanded private key
 func (k PhantasmaKeys) ExpandedPrivateKey() []byte {
 	return k.expandedPrivateKey
 }
 
-//PrivateKey returns the associated private key
+// PrivateKey returns the associated private key
 func (k PhantasmaKeys) PrivateKey() []byte {
 	return k.privateKey
 }
 
-//PublicKey returns the associated public key
+// PublicKey returns the associated public key
 func (k PhantasmaKeys) PublicKey() []byte {
 	return k.publicKey
 }
 
-//Address returns the associated address
+// Address returns the associated address
 func (k PhantasmaKeys) Address() Address {
 	return k.address
 }
