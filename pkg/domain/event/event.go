@@ -241,8 +241,8 @@ type TransactionSettleEventData struct {
 
 type GasEventData struct {
 	Address crypto.Address
-	price   big.Int
-	amount  big.Int
+	Price   big.Int
+	Amount  big.Int
 }
 
 type Event struct {

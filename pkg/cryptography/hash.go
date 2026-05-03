@@ -3,6 +3,7 @@ package cryptography
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"slices"
 	"strings"
 
@@ -19,10 +20,8 @@ const HashLength = 32
 // HexPrefix const
 const HexPrefix = "0x"
 
-// Hash struct
+// Hash stores a 32-byte transaction, block or content hash.
 type Hash struct {
-
-	// Code to run in PhantasmaVM for this transaction.
 	_data []byte
 }
 
@@ -49,17 +48,17 @@ func ParseHash(s string) (Hash, error) {
 		s = s[2:]
 	}
 
-	if len(s) < 64 || len(s) == 0 {
-		panic("string has wrong format")
+	if len(s) != HashLength*2 {
+		return Hash{}, errors.New("hash string must contain exactly 64 hex characters")
 	}
 
-	bytes, err := hex.DecodeString(s)
+	data, err := hex.DecodeString(s)
 	if err != nil {
 		return Hash{}, err
 	}
 
-	slices.Reverse(bytes)
-	return Hash{bytes}, nil
+	slices.Reverse(data)
+	return Hash{data}, nil
 }
 
 // Size returns the length of the underlying byte slice
@@ -74,11 +73,7 @@ func (h Hash) IsNull() bool {
 	}
 
 	empty := make([]byte, HashLength)
-	if !bytes.Equal(h._data, empty) {
-		return false
-	}
-
-	return true
+	return bytes.Equal(h._data, empty)
 }
 
 // String creates the a base16 encoded representation of Hash

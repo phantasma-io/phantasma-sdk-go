@@ -28,7 +28,12 @@ func printSoulmastersCount() {
 		panic("Script invocation failed! Error: " + err.Error())
 	}
 
-	fmt.Println("Current SoulMasters count: ", result.DecodeResult().AsNumber().String())
+	value, err := result.DecodeResultWithError()
+	if err != nil {
+		panic("Script result decoding failed! Error: " + err.Error())
+	}
+
+	fmt.Println("Current SoulMasters count: ", value.AsNumber().String())
 }
 
 func printSoulmastersCountAndLastInflationDate() {
@@ -55,5 +60,15 @@ func printSoulmastersCountAndLastInflationDate() {
 		panic("Script invocation failed! Error: " + err.Error())
 	}
 
-	fmt.Printf("Current SoulMasters count: %s, last inflation date: %s \n", result.DecodeResults(0).AsString(), result.DecodeResults(1).AsString())
+	mastersCount, err := result.DecodeResultsWithError(0)
+	if err != nil {
+		panic("SoulMasters count decoding failed! Error: " + err.Error())
+	}
+
+	lastInflationDate, err := result.DecodeResultsWithError(1)
+	if err != nil {
+		panic("Last inflation date decoding failed! Error: " + err.Error())
+	}
+
+	fmt.Printf("Current SoulMasters count: %s, last inflation date: %s \n", mastersCount.AsString(), lastInflationDate.AsString())
 }

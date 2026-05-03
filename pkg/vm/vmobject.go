@@ -138,7 +138,7 @@ func (v *VMObject) SetValue(val []byte, vmtype VMType) *VMObject {
 	case Number:
 		{
 			var n *big.Int
-			if val == nil || len(val) == 0 {
+			if len(val) == 0 {
 				n = big.NewInt(0)
 			} else {
 				n = util.BigIntFromCsharpOrPhantasmaByteArray(val)

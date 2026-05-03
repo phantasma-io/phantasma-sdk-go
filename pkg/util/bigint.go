@@ -56,7 +56,7 @@ func BigIntBytesFromCsharpOrPhantasmaByteArray(bytes []byte) ([]byte, int) {
 	copy(n, bytes)
 
 	if len(n) == 1 && n[0] == 0x00 {
-		return []byte{}, 0 // To keep compatibility with BinWriter/Reader tests, doesn't change the value of big int
+		return []byte{}, 0
 	}
 
 	if n[len(n)-1] < 128 {
