@@ -3,8 +3,8 @@ package contract
 import (
 	"testing"
 
-	sdkio "github.com/phantasma-io/phantasma-go/pkg/io"
-	"github.com/phantasma-io/phantasma-go/pkg/vm"
+	sdkio "github.com/phantasma-io/phantasma-sdk-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/vm"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 

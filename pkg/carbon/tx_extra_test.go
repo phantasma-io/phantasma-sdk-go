@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
 )
 
 func TestCarbonTxExtraVectors(t *testing.T) {

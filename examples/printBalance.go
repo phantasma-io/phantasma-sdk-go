@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/phantasma-io/phantasma-go/pkg/rpc/response"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/rpc/response"
 )
 
 func printBalance(address string) (int, []response.BalanceResult) {

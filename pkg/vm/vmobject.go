@@ -6,10 +6,10 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/domain/types"
-	"github.com/phantasma-io/phantasma-go/pkg/io"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain/types"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
 )
 
 type VMObject struct {

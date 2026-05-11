@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/vm"
-	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/vm"
+	scriptbuilder "github.com/phantasma-io/phantasma-sdk-go/pkg/vm/script_builder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

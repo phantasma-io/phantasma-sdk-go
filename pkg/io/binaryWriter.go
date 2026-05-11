@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/phantasma-io/phantasma-go/pkg/domain/types"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain/types"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
 )
 
 // BinWriter is a convenient wrapper around a io.Writer and err object.

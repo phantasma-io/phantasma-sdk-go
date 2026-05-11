@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
+	scriptbuilder "github.com/phantasma-io/phantasma-sdk-go/pkg/vm/script_builder"
 )
 
 func printSoulmastersCount() {

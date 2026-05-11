@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phantasma-io/phantasma-go/pkg/rpc/response"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/rpc/response"
 )
 
 func TestGetChainToken(t *testing.T) {

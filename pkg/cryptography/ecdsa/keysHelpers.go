@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"github.com/dustinxie/ecc"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
 )
 
 // UncompressedPublicKeyTo65Bytes returns pubkey with the uncompressed-key prefix.

@@ -3,7 +3,7 @@ package ecdsa
 import (
 	"math/big"
 
-	"github.com/phantasma-io/phantasma-go/pkg/util"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
 )
 
 // Removes recovery ID from signature's byte array in 65-byte [R || S || V] format

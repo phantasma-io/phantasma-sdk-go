@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/phantasma-io/phantasma-go/pkg/io"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
-	hashing "github.com/phantasma-io/phantasma-go/pkg/util/hashing"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
+	hashing "github.com/phantasma-io/phantasma-sdk-go/pkg/util/hashing"
 )
 
 // TODO Hash.Null

@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
 )
 
 func addressFromText(text string) (cryptography.Address, error) {

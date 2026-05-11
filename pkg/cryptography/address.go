@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/phantasma-io/phantasma-go/pkg/encoding/base58"
-	"github.com/phantasma-io/phantasma-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/encoding/base58"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 )
 
 // Length is the length of data

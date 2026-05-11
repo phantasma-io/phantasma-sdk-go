@@ -7,7 +7,7 @@ import (
 	"errors"
 
 	"github.com/dustinxie/ecc"
-	hash "github.com/phantasma-io/phantasma-go/pkg/util/hashing"
+	hash "github.com/phantasma-io/phantasma-sdk-go/pkg/util/hashing"
 )
 
 func Sign(message, prikey []byte, curve ECDsaCurve) ([]byte, error) {

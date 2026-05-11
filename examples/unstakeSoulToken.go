@@ -6,11 +6,11 @@ import (
 	"math/big"
 	"time"
 
-	chain "github.com/phantasma-io/phantasma-go/pkg/blockchain"
-	crypto "github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/domain"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
-	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
+	chain "github.com/phantasma-io/phantasma-sdk-go/pkg/blockchain"
+	crypto "github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
+	scriptbuilder "github.com/phantasma-io/phantasma-sdk-go/pkg/vm/script_builder"
 )
 
 func unstakeSoulToken(address crypto.Address, tokenAmount *big.Int) {

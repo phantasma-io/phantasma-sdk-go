@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/phantasma-io/phantasma-go/pkg/domain/event"
-	"github.com/phantasma-io/phantasma-go/pkg/io"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain/event"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
 )
 
 func onTransactionReceived(address, symbol, amount string) {

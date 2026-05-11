@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/phantasma-io/phantasma-go/pkg/jsonrpc"
-	resp "github.com/phantasma-io/phantasma-go/pkg/rpc/response"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/jsonrpc"
+	resp "github.com/phantasma-io/phantasma-sdk-go/pkg/rpc/response"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,5 +1,5 @@
 <p align="center">
-<img src="./.github/phantasma-go.jpg" width="300px" alt="logo">
+<img src="./.github/phantasma-sdk-go.jpg" width="300px" alt="logo">
 </p>
 <p align="center">
   <b>Go</b> SDK for the <a href="https://phantasma.io">Phantasma</a> blockchain.
@@ -7,7 +7,7 @@
 
 <hr />
 
-![License](https://img.shields.io/github/license/phantasma-io/phantasma-go.svg?style=popout)
+![License](https://img.shields.io/github/license/phantasma-io/phantasma-sdk-go.svg?style=popout)
 
 # Overview
 
@@ -19,10 +19,10 @@ This project aims to be an easy to use SDK for the Phantasma blockchain.
 
 Requires Go 1.25 or newer. The module is developed with the Go 1.26 toolchain.
 
-PhantasmaGo is distributed as a library that includes all the functionality provided.
+`phantasma-sdk-go` is distributed as a library that includes all SDK functionality.
 
 ```
-go get -u github.com/phantasma-io/phantasma-go
+go get -u github.com/phantasma-io/phantasma-sdk-go
 ```
 
 ## Getting started
@@ -107,7 +107,7 @@ if err != nil {
 schemas := carbon.PrepareStandardTokenSchemas(false)
 rom, err := carbon.BuildNFTRom(schemas.ROM, big.NewInt(1), []carbon.MetadataField{
     {Name: "name", Value: "Example NFT"},
-    {Name: "description", Value: "Minted with phantasma-go Carbon helpers"},
+    {Name: "description", Value: "Minted with phantasma-sdk-go Carbon helpers"},
     {Name: "imageURL", Value: "https://example.com/nft.png"},
     {Name: "infoURL", Value: "https://example.com/nft"},
     {Name: "royalties", Value: int32(0)},

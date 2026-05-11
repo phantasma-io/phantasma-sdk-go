@@ -8,8 +8,8 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/phantasma-io/phantasma-go/pkg/domain/types"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain/types"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
 )
 
 // MaxArraySize is the maximum size of an array which can be decoded.

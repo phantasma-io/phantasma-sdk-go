@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	chain "github.com/phantasma-io/phantasma-go/pkg/blockchain"
-	"github.com/phantasma-io/phantasma-go/pkg/carbon"
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/jsonrpc"
-	resp "github.com/phantasma-io/phantasma-go/pkg/rpc/response"
+	chain "github.com/phantasma-io/phantasma-sdk-go/pkg/blockchain"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/carbon"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/jsonrpc"
+	resp "github.com/phantasma-io/phantasma-sdk-go/pkg/rpc/response"
 )
 
 // PhantasmaRPC is a JSON-RPC client for Phantasma node endpoints.

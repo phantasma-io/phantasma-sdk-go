@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/rpc"
-	"github.com/phantasma-io/phantasma-go/pkg/rpc/response"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/rpc"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/rpc/response"
 )
 
 var netSelected string

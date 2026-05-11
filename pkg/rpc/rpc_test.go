@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/phantasma-io/phantasma-go/pkg/rpc"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/rpc"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -8,9 +8,9 @@ import (
 
 	"github.com/dustinxie/ecc"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography/ecdsa"
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography/neoLegacy"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography/ecdsa"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography/neoLegacy"
 )
 
 type ProofOfAddressesVerifier struct {

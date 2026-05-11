@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	hash "github.com/phantasma-io/phantasma-go/pkg/util/hashing"
+	hash "github.com/phantasma-io/phantasma-sdk-go/pkg/util/hashing"
 	"github.com/stretchr/testify/assert"
 )
 
