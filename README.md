@@ -67,7 +67,7 @@ if err != nil {
 }
 ```
 
-This will allow you to get token characteristics this way:
+You can then read token characteristics this way:
 
 ```
 t, ok := getChainToken("SOUL")
@@ -157,9 +157,9 @@ Use `client.CallContext(ctx, method, params...)` for low-level calls that need r
 
 ## Script Builder
 
-Building a script is the most important part of interacting with the Phantasma blockchain. Without a proper script, the Phantasma blockchain will not know what you are trying to do.
+Building a script is the main entry point for transaction and contract interactions. The script must match the target contract or interop ABI.
 
-These functions, `CallContract` and `CallInterop`, are your bread and butter for creating new scripts.
+The `CallContract` and `CallInterop` methods are the primary entry points for creating scripts.
 
 ```
 func (s ScriptBuilder) CallContract(contractName, method string, args ...interface{}) ScriptBuilder
@@ -169,9 +169,9 @@ func (s ScriptBuilder) CallContract(contractName, method string, args ...interfa
 func (s ScriptBuilder) CallInterop(method string, args ...interface{}) ScriptBuilder
 ```
 
-You can find out all the different `CallInterop` functions below.
+The available `CallInterop` functions are listed below.
 
-For `CallContract`, you will have to look through the ABI's of all the different smart contracts currently deployed on the Phantasma 'mainnet': [Link Here](https://explorer.phantasma.info/en/nexus?tab=contracts). To see all methods of a contract, for example `stake`, you can check it with explorer: [Link Here](https://explorer.phantasma.info/en/contract?id=stake&tab=methods).
+For `CallContract`, inspect the ABIs of the smart contracts currently deployed on Phantasma mainnet: [Explorer contract list](https://explorer.phantasma.info/en/nexus?tab=contracts). To see all methods of a contract, for example `stake`, check the contract methods view: [stake contract methods](https://explorer.phantasma.info/en/contract?id=stake&tab=methods).
 
 The Go builder now resolves labels per instance, emits integer values as VM `Number` payloads, supports array arguments, and matches the C#/TS/C++ shared script vectors.
 Address arguments are intentionally typed as `cryptography.Address` in high-level helpers. Raw `string` arguments passed to `CallContract` or `CallInterop` are emitted as VM strings; use `cryptography.MustAddressFromString(text)` or the `*Text` helpers when the ABI expects a Phantasma address.

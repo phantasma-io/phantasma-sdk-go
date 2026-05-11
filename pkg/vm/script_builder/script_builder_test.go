@@ -1,11 +1,16 @@
 package scriptbuilder_test
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
 	"github.com/phantasma-io/phantasma-sdk-go/pkg/vm"
@@ -15,6 +20,7 @@ import (
 )
 
 const expectedConsensusSingleVoteScriptHex = "0D00030350340303000D000302102703000D000223220000000000000000000000000000000000000000000000000000000000000000000003000D000223220100AA53BE71FC41BC0889B694F4D6D03F7906A3D9A21705943CAF9632EEAFBB489503000D000408416C6C6F7747617303000D0004036761732D00012E010D0003010003000D00041D73797374656D2E6E657875732E70726F746F636F6C2E76657273696F6E03000D00042F50324B464579466576705166536157384734566A536D6857555A585234517247395951523148624D7054554370434C03000D00040A53696E676C65566F746503000D000409636F6E73656E7375732D00012E010D000223220100AA53BE71FC41BC0889B694F4D6D03F7906A3D9A21705943CAF9632EEAFBB489503000D0004085370656E6447617303000D0004036761732D00012E010B"
+const scriptBuilderFixtureSHA256 = "81907a6b1df095b84599d8f8d709623e20dadeca2082ab9dffef114c7d0015e0"
 
 func TestNewScript(t *testing.T) {
 	fromAddress := cryptography.MustAddressFromString("P2KM9FjYrDXnPPAynLXAHdQ8wYz8de9VbDeybrLepnw6C5x")
@@ -103,6 +109,17 @@ func TestScriptBuilderMatchesSharedVector(t *testing.T) {
 	require.Equal(t, expectedConsensusSingleVoteScriptHex, strings.ToUpper(hex.EncodeToString(script)))
 }
 
+func TestScriptBuilderMatchesGoldenVectors(t *testing.T) {
+	// The TSV was generated from the Gen2 C# SDK and covers high-level helpers
+	// plus array/timestamp argument loading that had drifted between SDKs.
+	for _, row := range scriptBuilderFixtureRows(t) {
+		caseID, source, expectedHex := row[0], row[1], row[2]
+		require.Equal(t, "csharp_sdk", source)
+		require.Equal(t, expectedHex, strings.ToUpper(hex.EncodeToString(scriptBuilderVector(t, caseID))), caseID)
+		require.NotEmpty(t, row[3], caseID)
+	}
+}
+
 func TestScriptBuilderResolvesLabelsPerInstance(t *testing.T) {
 	// Label resolution must be scoped to one builder so finished scripts do not leak labels into later builders.
 	first := scriptbuilder.BeginScript().
@@ -155,4 +172,70 @@ func TestEmitExtCallUsesExtCallOpcode(t *testing.T) {
 	require.Equal(t, byte(vm.EXTCALL), script[len(script)-3])
 	require.Equal(t, byte(0), script[len(script)-2])
 	require.Equal(t, byte(vm.RET), script[len(script)-1])
+}
+
+func scriptBuilderFixtureRows(t *testing.T) [][]string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", "vm_script_builder_vectors.tsv"))
+	require.NoError(t, err)
+	require.Equal(t, scriptBuilderFixtureSHA256, fmt.Sprintf("%x", sha256.Sum256(data)))
+
+	rows := [][]string{}
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if line == "" || strings.HasPrefix(line, "case_id\t") {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		require.Len(t, parts, 4, line)
+		rows = append(rows, parts)
+	}
+	return rows
+}
+
+func scriptBuilderVector(t *testing.T, caseID string) []byte {
+	t.Helper()
+	// Deterministic, non-funded fixture keys used only to reproduce the shared
+	// Gen2 C# golden scripts.
+	mainKeys, err := cryptography.FromWIF("L5UEVHBjujaR1721aZM5Zm5ayjDyamMZS9W35RE9Y9giRkdf3dVx")
+	require.NoError(t, err)
+	helperKeys, err := cryptography.FromWIF("KxMn2TgXukYaNXx7tEdjh7qB2YaMgeuKy47j4rvKigHhBuZWeP3r")
+	require.NoError(t, err)
+	address := helperKeys.Address()
+	nullAddress := cryptography.NullAddress()
+
+	switch caseID {
+	case "consensus_single_vote":
+		return scriptbuilder.BeginScript().
+			AllowGas(mainKeys.Address(), nullAddress, big.NewInt(10000), big.NewInt(210000)).
+			CallContract("consensus", "SingleVote", mainKeys.Address().Text(), "system.nexus.protocol.version", 0).
+			SpendGas(mainKeys.Address()).
+			EndScript()
+	case "gas_transfer_spend":
+		return scriptbuilder.BeginScript().
+			AllowGas(address, nullAddress, big.NewInt(100000), big.NewInt(21000)).
+			TransferTokens("SOUL", address, nullAddress, big.NewInt(100000000)).
+			SpendGas(address).
+			EndScript()
+	case "mint_tokens":
+		return scriptbuilder.BeginScript().MintTokens("SOUL", address, nullAddress, big.NewInt(1)).EndScript()
+	case "transfer_balance":
+		return scriptbuilder.BeginScript().TransferBalance("KCAL", address, nullAddress).EndScript()
+	case "transfer_nft":
+		return scriptbuilder.BeginScript().TransferNFT("ART", address, nullAddress, big.NewInt(42)).EndScript()
+	case "cross_transfer_token":
+		return scriptbuilder.BeginScript().CrossTransferToken(nullAddress, "SOUL", address, nullAddress, big.NewInt(1)).EndScript()
+	case "cross_transfer_nft":
+		return scriptbuilder.BeginScript().CrossTransferNFT(nullAddress, "ART", address, nullAddress, big.NewInt(7)).EndScript()
+	case "stake_unstake":
+		return scriptbuilder.BeginScript().Stake(address, big.NewInt(7)).Unstake(address, big.NewInt(8)).EndScript()
+	case "call_nft":
+		return scriptbuilder.BeginScript().CallNFT("ART", big.NewInt(7), "mint", address).EndScript()
+	case "runtime_array_timestamp":
+		return scriptbuilder.BeginScript().
+			CallInterop("Runtime.Test", []interface{}{"alpha", big.NewInt(7)}, time.Unix(1778330400, 0).UTC()).
+			EndScript()
+	default:
+		t.Fatalf("unhandled script vector: %s", caseID)
+		return nil
+	}
 }

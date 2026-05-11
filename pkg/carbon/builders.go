@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -101,7 +102,15 @@ func BuildTokenMetadata(fields map[string]string) ([]byte, error) {
 	}
 
 	structure := VMDynamicStruct{}
-	for name, value := range fields {
+	// Token metadata bytes are part of the signed transaction payload, so map
+	// input must be canonicalized before serialization.
+	names := make([]string, 0, len(fields))
+	for name := range fields {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		value := fields[name]
 		field, err := NewVMNamedDynamicVariable(name, VMTypeString, value)
 		if err != nil {
 			return nil, err

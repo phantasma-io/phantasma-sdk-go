@@ -160,8 +160,8 @@ func (s ScriptBuilder) EmitLoadBool(reg byte, toLoad bool) ScriptBuilder {
 
 // EmitLoadTime loads a timestamp value into reg.
 func (s ScriptBuilder) EmitLoadTime(reg byte, toLoad time.Time) ScriptBuilder {
-	bytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(bytes, uint64(toLoad.Unix()))
+	bytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bytes, uint32(toLoad.Unix()))
 	s.EmitLoad(reg, bytes, vm.Timestamp)
 	return s
 }
