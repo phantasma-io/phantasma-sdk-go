@@ -612,7 +612,7 @@ func BuildTokenInfo(symbol string, maxSupply IntX, isNFT bool, decimals byte, ow
 			return TokenInfo{}, fmt.Errorf("token schemas are required for NFTs")
 		}
 		flags = TokenFlagsNonFungible
-	} else if !maxSupply.Is8ByteSafe() {
+	} else if maxSupply.BigInt().Sign() == 0 || !maxSupply.Is8ByteSafe() {
 		flags = TokenFlagsBigFungible
 	}
 
