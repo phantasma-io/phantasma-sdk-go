@@ -6,11 +6,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/phantasma-io/phantasma-go/pkg/blockchain"
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/domain"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
-	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/blockchain"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
+	scriptbuilder "github.com/phantasma-io/phantasma-sdk-go/pkg/vm/script_builder"
 )
 
 func sendFungibleToken(tokenSymbol string, to cryptography.Address, tokenAmount *big.Int) {
@@ -26,7 +26,10 @@ func sendFungibleToken(tokenSymbol string, to cryptography.Address, tokenAmount 
 	tx := blockchain.NewTransaction(netSelected, "main", script, uint32(expire), domain.SDKPayload)
 
 	// Sign transaction
-	tx.Sign(keyPair)
+	if err := tx.Sign(keyPair); err != nil {
+		fmt.Println("Signing transaction failed:", err)
+		return
+	}
 
 	fmt.Println("Tx script: " + hex.EncodeToString(script))
 
@@ -39,16 +42,16 @@ func sendFungibleToken(tokenSymbol string, to cryptography.Address, tokenAmount 
 		return
 	}
 
-	txHash, err := client.SendRawTransaction(txHex)
+	txHash, err := client.SendRawTransaction(rpcContext, txHex)
 	if err != nil {
-		panic("Broadcasting tx failed! Error: " + err.Error())
-	} else {
-		if util.ErrorDetect(txHash) {
-			panic("Broadcasting tx failed! Error: " + txHash)
-		} else {
-			fmt.Println("Tx successfully broadcasted! Tx hash: " + txHash)
-		}
+		fmt.Println("Broadcasting tx failed:", err)
+		return
 	}
+	if util.ErrorDetect(txHash) {
+		fmt.Println("Broadcasting tx failed:", txHash)
+		return
+	}
+	fmt.Println("Tx successfully broadcasted! Tx hash: " + txHash)
 
 	waitForTransactionResult(txHash)
 }

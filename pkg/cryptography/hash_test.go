@@ -29,6 +29,18 @@ func TestHashBytes(t *testing.T) {
 	assert.Equal(t, result, hash.Bytes())
 }
 
+func TestHashBytesReturnsDefensiveCopy(t *testing.T) {
+	input := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 48, 49}
+	hash, err := HashFromBytes(input)
+	assert.NoError(t, err)
+
+	input[0] = 99
+	bytes := hash.Bytes()
+	bytes[1] = 88
+
+	assert.Equal(t, []byte{0, 1, 2, 3}, hash.Bytes()[:4])
+}
+
 func TestHashParse(t *testing.T) {
 	// ParseHash accepts the canonical 64-character public hex form and preserves String roundtrip.
 	hash, _ := ParseHash("e4e5697cae3e55c6ebb185cadbe6c957109b11b1519b284c76892433151bcb4b")

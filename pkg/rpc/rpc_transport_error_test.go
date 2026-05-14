@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/phantasma-io/phantasma-go/pkg/jsonrpc"
-	resp "github.com/phantasma-io/phantasma-go/pkg/rpc/response"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/jsonrpc"
+	resp "github.com/phantasma-io/phantasma-sdk-go/pkg/rpc/response"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,12 +36,14 @@ func (c stubRPCClient) CallBatchRaw(ctx context.Context, requests jsonrpc.RPCReq
 }
 
 type recordingRPCClient struct {
+	ctx      context.Context
 	method   string
 	params   []interface{}
 	response *jsonrpc.RPCResponse
 }
 
 func (c *recordingRPCClient) Call(ctx context.Context, method string, params ...interface{}) (*jsonrpc.RPCResponse, error) {
+	c.ctx = ctx
 	c.method = method
 	c.params = append([]interface{}{}, params...)
 	return c.response, nil
@@ -68,7 +70,7 @@ func TestGetAccountRejectsNilRPCResponseWithoutPanic(t *testing.T) {
 
 	var err error
 	require.NotPanics(t, func() {
-		_, err = client.GetAccount("P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP")
+		_, err = client.GetAccount(context.Background(), "P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP")
 	})
 	require.Error(t, err)
 }
@@ -79,7 +81,7 @@ func TestLookupNameCallsLookupNameAndReturnsAddress(t *testing.T) {
 	}
 	client := PhantasmaRPC{client: recorder}
 
-	address, err := client.LookupName("anonymous")
+	address, err := client.LookupName(context.Background(), "anonymous")
 
 	require.NoError(t, err)
 	require.Equal(t, "P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP", address)
@@ -87,11 +89,26 @@ func TestLookupNameCallsLookupNameAndReturnsAddress(t *testing.T) {
 	require.Equal(t, []interface{}{"anonymous"}, recorder.params)
 }
 
+func TestTypedRPCWrapperUsesCallerContext(t *testing.T) {
+	type contextKey struct{}
+
+	recorder := &recordingRPCClient{
+		response: &jsonrpc.RPCResponse{Result: []interface{}{}},
+	}
+	client := PhantasmaRPC{client: recorder}
+	ctx := context.WithValue(context.Background(), contextKey{}, "caller-context")
+
+	_, err := client.GetChains(ctx, true)
+
+	require.NoError(t, err)
+	require.Same(t, ctx, recorder.ctx)
+}
+
 func TestGetBlockHeightRejectsInvalidHeightWithoutNilResult(t *testing.T) {
 	// RPC height parsing must return an explicit error instead of a nil *big.Int with nil error.
 	client := PhantasmaRPC{client: stubRPCClient{response: &jsonrpc.RPCResponse{Result: "not-a-number"}}}
 
-	height, err := client.GetBlockHeight("main")
+	height, err := client.GetBlockHeight(context.Background(), "main")
 
 	require.Error(t, err)
 	require.NotNil(t, height)
@@ -103,7 +120,7 @@ func TestSignAndSendTransactionRejectsNilKeyWithoutPanic(t *testing.T) {
 
 	var err error
 	require.NotPanics(t, func() {
-		_, err = client.SignAndSendTransaction(nil, "testnet", []byte{0x01}, "main", nil)
+		_, err = client.SignAndSendTransaction(context.Background(), nil, "testnet", []byte{0x01}, "main", nil)
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "key pair")
@@ -135,7 +152,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountsWithAddressType",
 			response: arrayResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountsWithAddressType([]string{"Pone", "Ptwo"}, true, true, AddressTypeCarbon)
+				_, err := client.GetAccountsWithAddressType(context.Background(), []string{"Pone", "Ptwo"}, true, true, AddressTypeCarbon)
 				return err
 			},
 			method: "getAccounts",
@@ -145,7 +162,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountWithAddressType",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountWithAddressType("Paccount", true, false, AddressTypeCarbon)
+				_, err := client.GetAccountWithAddressType(context.Background(), "Paccount", true, false, AddressTypeCarbon)
 				return err
 			},
 			method: "getAccount",
@@ -155,7 +172,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetBlockTransactionCountByHash",
 			response: "7",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetBlockTransactionCountByHash("block-hash")
+				_, err := client.GetBlockTransactionCountByHash(context.Background(), "block-hash")
 				return err
 			},
 			method: "getBlockTransactionCountByHash",
@@ -165,7 +182,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetBlockTransactionCountByHashOnChain",
 			response: "7",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetBlockTransactionCountByHashOnChain("custom", "block-hash")
+				_, err := client.GetBlockTransactionCountByHashOnChain(context.Background(), "custom", "block-hash")
 				return err
 			},
 			method: "getBlockTransactionCountByHash",
@@ -175,7 +192,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetBlockByHash",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetBlockByHash("block-hash")
+				_, err := client.GetBlockByHash(context.Background(), "block-hash")
 				return err
 			},
 			method: "getBlockByHash",
@@ -185,7 +202,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetLatestBlock",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetLatestBlock("main")
+				_, err := client.GetLatestBlock(context.Background(), "main")
 				return err
 			},
 			method: "getLatestBlock",
@@ -195,7 +212,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTransactionByBlockHashAndIndex",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTransactionByBlockHashAndIndex("block-hash", 2)
+				_, err := client.GetTransactionByBlockHashAndIndex(context.Background(), "block-hash", 2)
 				return err
 			},
 			method: "getTransactionByBlockHashAndIndex",
@@ -205,7 +222,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTransactionByBlockHashAndIndexOnChain",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTransactionByBlockHashAndIndexOnChain("custom", "block-hash", 3)
+				_, err := client.GetTransactionByBlockHashAndIndexOnChain(context.Background(), "custom", "block-hash", 3)
 				return err
 			},
 			method: "getTransactionByBlockHashAndIndex",
@@ -215,7 +232,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetChains",
 			response: arrayResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetChains(true)
+				_, err := client.GetChains(context.Background(), true)
 				return err
 			},
 			method: "getChains",
@@ -225,7 +242,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetChain",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetChain("main", true)
+				_, err := client.GetChain(context.Background(), "main", true)
 				return err
 			},
 			method: "getChain",
@@ -235,7 +252,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetNexus",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetNexus(true)
+				_, err := client.GetNexus(context.Background(), true)
 				return err
 			},
 			method: "getNexus",
@@ -245,7 +262,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetContracts",
 			response: arrayResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetContracts("main", true)
+				_, err := client.GetContracts(context.Background(), "main", true)
 				return err
 			},
 			method: "getContracts",
@@ -255,7 +272,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetContractByName",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetContractByName("main", "gas")
+				_, err := client.GetContractByName(context.Background(), "main", "gas")
 				return err
 			},
 			method: "getContract",
@@ -265,7 +282,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetContractByAddress",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetContractByAddress("main", "Pcontract")
+				_, err := client.GetContractByAddress(context.Background(), "main", "Pcontract")
 				return err
 			},
 			method: "getContractByAddress",
@@ -275,7 +292,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetOrganization",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetOrganization("org-id", true)
+				_, err := client.GetOrganization(context.Background(), "org-id", true)
 				return err
 			},
 			method: "getOrganization",
@@ -285,7 +302,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetOrganizationByName",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetOrganizationByName("validators", true)
+				_, err := client.GetOrganizationByName(context.Background(), "validators", true)
 				return err
 			},
 			method: "getOrganizationByName",
@@ -295,7 +312,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetOrganizations",
 			response: arrayResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetOrganizations(true)
+				_, err := client.GetOrganizations(context.Background(), true)
 				return err
 			},
 			method: "getOrganizations",
@@ -305,7 +322,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetLeaderboard",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetLeaderboard("top")
+				_, err := client.GetLeaderboard(context.Background(), "top")
 				return err
 			},
 			method: "getLeaderboard",
@@ -315,7 +332,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "SendCarbonTransaction",
 			response: "tx-hash",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.SendCarbonTransaction("00")
+				_, err := client.SendCarbonTransaction(context.Background(), "00")
 				return err
 			},
 			method: "sendCarbonTransaction",
@@ -325,7 +342,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokensByOwner",
 			response: arrayResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokensByOwner(true, "Powner")
+				_, err := client.GetTokensByOwner(context.Background(), true, "Powner")
 				return err
 			},
 			method: "getTokens",
@@ -335,7 +352,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokensByOwnerWithAddressType",
 			response: arrayResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokensByOwnerWithAddressType(true, "Powner", AddressTypeCarbon)
+				_, err := client.GetTokensByOwnerWithAddressType(context.Background(), true, "Powner", AddressTypeCarbon)
 				return err
 			},
 			method: "getTokens",
@@ -345,7 +362,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenWithID",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenWithID("NFT", true, 42)
+				_, err := client.GetTokenWithID(context.Background(), "NFT", true, 42)
 				return err
 			},
 			method: "getToken",
@@ -356,7 +373,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenWithIDDefaultCarbonID",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenWithID("NFT", true, 0)
+				_, err := client.GetTokenWithID(context.Background(), "NFT", true, 0)
 				return err
 			},
 			method: "getToken",
@@ -366,7 +383,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenData",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenData("NFT", "100")
+				_, err := client.GetTokenData(context.Background(), "NFT", "100")
 				return err
 			},
 			method: "getTokenData",
@@ -376,7 +393,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenBalance",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenBalance("Paccount", "SOUL", "main")
+				_, err := client.GetTokenBalance(context.Background(), "Paccount", "SOUL", "main")
 				return err
 			},
 			method: "getTokenBalance",
@@ -386,7 +403,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenBalanceChecked",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenBalanceChecked("Paccount", "SOUL", "main", true)
+				_, err := client.GetTokenBalanceChecked(context.Background(), "Paccount", "SOUL", "main", true)
 				return err
 			},
 			method: "getTokenBalance",
@@ -396,7 +413,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenBalanceWithAddressType",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenBalanceWithAddressType("Paccount", "SOUL", "main", true, AddressTypeCarbon)
+				_, err := client.GetTokenBalanceWithAddressType(context.Background(), "Paccount", "SOUL", "main", true, AddressTypeCarbon)
 				return err
 			},
 			method: "getTokenBalance",
@@ -406,7 +423,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenSeries",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenSeries("NFT", 42, 10, "cursor")
+				_, err := client.GetTokenSeries(context.Background(), "NFT", 42, 10, "cursor")
 				return err
 			},
 			method: "getTokenSeries",
@@ -416,7 +433,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenSeriesDefaultCarbonID",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenSeries("NFT", 0, 10, "cursor")
+				_, err := client.GetTokenSeries(context.Background(), "NFT", 0, 10, "cursor")
 				return err
 			},
 			method: "getTokenSeries",
@@ -426,7 +443,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenSeriesByID",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenSeriesByID("NFT", 42, "9", 3)
+				_, err := client.GetTokenSeriesByID(context.Background(), "NFT", 42, "9", 3)
 				return err
 			},
 			method: "getTokenSeriesById",
@@ -436,7 +453,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenNFTs",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenNFTs(42, 3, 10, "cursor", true)
+				_, err := client.GetTokenNFTs(context.Background(), 42, 3, 10, "cursor", true)
 				return err
 			},
 			method: "getTokenNFTs",
@@ -446,7 +463,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetTokenNFTsWithSeriesID",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenNFTsWithSeriesID(42, 0, "9", 10, "cursor", true)
+				_, err := client.GetTokenNFTsWithSeriesID(context.Background(), 42, 0, "9", 10, "cursor", true)
 				return err
 			},
 			method: "getTokenNFTs",
@@ -456,7 +473,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountFungibleTokens",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountFungibleTokens("Paccount", "SOUL", 1, 10, "cursor", true)
+				_, err := client.GetAccountFungibleTokens(context.Background(), "Paccount", "SOUL", 1, 10, "cursor", true)
 				return err
 			},
 			method: "getAccountFungibleTokens",
@@ -466,7 +483,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountFungibleTokensWithAddressType",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountFungibleTokensWithAddressType("Paccount", "SOUL", 1, 10, "cursor", true, AddressTypeCarbon)
+				_, err := client.GetAccountFungibleTokensWithAddressType(context.Background(), "Paccount", "SOUL", 1, 10, "cursor", true, AddressTypeCarbon)
 				return err
 			},
 			method: "getAccountFungibleTokens",
@@ -476,7 +493,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountNFTs",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountNFTs("Paccount", "NFT", 42, 3, 10, "cursor", true, true)
+				_, err := client.GetAccountNFTs(context.Background(), "Paccount", "NFT", 42, 3, 10, "cursor", true, true)
 				return err
 			},
 			method: "getAccountNFTs",
@@ -486,7 +503,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountNFTsWithAddressType",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountNFTsWithAddressType("Paccount", "NFT", 42, 3, 10, "cursor", true, true, AddressTypeCarbon)
+				_, err := client.GetAccountNFTsWithAddressType(context.Background(), "Paccount", "NFT", 42, 3, 10, "cursor", true, true, AddressTypeCarbon)
 				return err
 			},
 			method: "getAccountNFTs",
@@ -496,7 +513,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountOwnedTokens",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountOwnedTokens("Paccount", "NFT", 42, 10, "cursor", true)
+				_, err := client.GetAccountOwnedTokens(context.Background(), "Paccount", "NFT", 42, 10, "cursor", true)
 				return err
 			},
 			method: "getAccountOwnedTokens",
@@ -506,7 +523,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountOwnedTokensWithAddressType",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountOwnedTokensWithAddressType("Paccount", "NFT", 42, 10, "cursor", true, AddressTypeCarbon)
+				_, err := client.GetAccountOwnedTokensWithAddressType(context.Background(), "Paccount", "NFT", 42, 10, "cursor", true, AddressTypeCarbon)
 				return err
 			},
 			method: "getAccountOwnedTokens",
@@ -516,7 +533,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountOwnedTokenSeries",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountOwnedTokenSeries("Paccount", "NFT", 42, 10, "cursor", true)
+				_, err := client.GetAccountOwnedTokenSeries(context.Background(), "Paccount", "NFT", 42, 10, "cursor", true)
 				return err
 			},
 			method: "getAccountOwnedTokenSeries",
@@ -526,7 +543,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAccountOwnedTokenSeriesWithAddressType",
 			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccountOwnedTokenSeriesWithAddressType("Paccount", "NFT", 42, 10, "cursor", true, AddressTypeCarbon)
+				_, err := client.GetAccountOwnedTokenSeriesWithAddressType(context.Background(), "Paccount", "NFT", 42, 10, "cursor", true, AddressTypeCarbon)
 				return err
 			},
 			method: "getAccountOwnedTokenSeries",
@@ -536,7 +553,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAuctionsCount",
 			response: "7",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAuctionsCount("main", "NFT")
+				_, err := client.GetAuctionsCount(context.Background(), "main", "NFT")
 				return err
 			},
 			method: "getAuctionsCount",
@@ -546,7 +563,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAuctions",
 			response: paginatedArrayResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAuctions("main", "NFT", 1, 10)
+				_, err := client.GetAuctions(context.Background(), "main", "NFT", 1, 10)
 				return err
 			},
 			method: "getAuctions",
@@ -556,7 +573,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetAuction",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAuction("main", "NFT", "100")
+				_, err := client.GetAuction(context.Background(), "main", "NFT", "100")
 				return err
 			},
 			method: "getAuction",
@@ -566,7 +583,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetNFT",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetNFT("NFT", "100", true)
+				_, err := client.GetNFT(context.Background(), "NFT", "100", true)
 				return err
 			},
 			method: "getNFT",
@@ -576,7 +593,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetNFTs",
 			response: arrayResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetNFTs("NFT", []string{"100", "101"}, true)
+				_, err := client.GetNFTs(context.Background(), "NFT", []string{"100", "101"}, true)
 				return err
 			},
 			method: "getNFTs",
@@ -586,7 +603,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetArchive",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetArchive("archive-hash")
+				_, err := client.GetArchive(context.Background(), "archive-hash")
 				return err
 			},
 			method: "getArchive",
@@ -596,7 +613,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "WriteArchive",
 			response: "true",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.WriteArchive("archive-hash", 4, []byte("block"))
+				_, err := client.WriteArchive(context.Background(), "archive-hash", 4, []byte("block"))
 				return err
 			},
 			method: "writeArchive",
@@ -606,7 +623,7 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "ReadArchive",
 			response: "YmxvY2s=",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.ReadArchive("archive-hash", 4)
+				_, err := client.ReadArchive(context.Background(), "archive-hash", 4)
 				return err
 			},
 			method: "readArchive",
@@ -680,154 +697,154 @@ func TestRPCMethodsReturnTransportErrorWithoutPanic(t *testing.T) {
 		{
 			name: "GetPlatforms",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetPlatforms()
+				_, err := client.GetPlatforms(context.Background())
 				return err
 			},
 		},
 		{
 			name: "GetAccounts",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccounts("P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP")
+				_, err := client.GetAccounts(context.Background(), "P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP")
 				return err
 			},
 		},
 		{
 			name: "LookupName",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.LookupName("anonymous")
+				_, err := client.LookupName(context.Background(), "anonymous")
 				return err
 			},
 		},
 		{
 			name: "GetAccount",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAccount("P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP")
+				_, err := client.GetAccount(context.Background(), "P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP")
 				return err
 			},
 		},
 		{
 			name: "GetAddressTransactions",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAddressTransactions("P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP", 1, 10)
+				_, err := client.GetAddressTransactions(context.Background(), "P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP", 1, 10)
 				return err
 			},
 		},
 		{
 			name: "GetAddressTransactionCount",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAddressTransactionCount("P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP", "main")
+				_, err := client.GetAddressTransactionCount(context.Background(), "P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP", "main")
 				return err
 			},
 		},
 		{
 			name: "GetBlockByHeight",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetBlockByHeight("main", "1")
+				_, err := client.GetBlockByHeight(context.Background(), "main", "1")
 				return err
 			},
 		},
 		{
 			name: "GetBlockHeight",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetBlockHeight("main")
+				_, err := client.GetBlockHeight(context.Background(), "main")
 				return err
 			},
 		},
 		{
 			name: "GetContract",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetContract("gas", "main")
+				_, err := client.GetContract(context.Background(), "gas", "main")
 				return err
 			},
 		},
 		{
 			name: "GetBlockByHash",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetBlockByHash("block-hash")
+				_, err := client.GetBlockByHash(context.Background(), "block-hash")
 				return err
 			},
 		},
 		{
 			name: "SendCarbonTransaction",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.SendCarbonTransaction("00")
+				_, err := client.SendCarbonTransaction(context.Background(), "00")
 				return err
 			},
 		},
 		{
 			name: "GetTokenSeries",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokenSeries("NFT", 42, 10, "")
+				_, err := client.GetTokenSeries(context.Background(), "NFT", 42, 10, "")
 				return err
 			},
 		},
 		{
 			name: "GetAuctionsCount",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetAuctionsCount("main", "NFT")
+				_, err := client.GetAuctionsCount(context.Background(), "main", "NFT")
 				return err
 			},
 		},
 		{
 			name: "WriteArchive",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.WriteArchive("archive-hash", 0, nil)
+				_, err := client.WriteArchive(context.Background(), "archive-hash", 0, nil)
 				return err
 			},
 		},
 		{
 			name: "InvokeRawScript",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.InvokeRawScript("main", "00")
+				_, err := client.InvokeRawScript(context.Background(), "main", "00")
 				return err
 			},
 		},
 		{
 			name: "SendRawTransaction",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.SendRawTransaction("00")
+				_, err := client.SendRawTransaction(context.Background(), "00")
 				return err
 			},
 		},
 		{
 			name: "GetTransaction",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTransaction("00")
+				_, err := client.GetTransaction(context.Background(), "00")
 				return err
 			},
 		},
 		{
 			name: "GetTokens",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokens(false)
+				_, err := client.GetTokens(context.Background(), false)
 				return err
 			},
 		},
 		{
 			name: "GetTokensAsMap",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetTokensAsMap(false)
+				_, err := client.GetTokensAsMap(context.Background(), false)
 				return err
 			},
 		},
 		{
 			name: "GetToken",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetToken("SOUL", false)
+				_, err := client.GetToken(context.Background(), "SOUL", false)
 				return err
 			},
 		},
 		{
 			name: "GetVersion",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetVersion()
+				_, err := client.GetVersion(context.Background())
 				return err
 			},
 		},
 		{
 			name: "GetPhantasmaVMConfig",
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetPhantasmaVMConfig("main")
+				_, err := client.GetPhantasmaVMConfig(context.Background(), "main")
 				return err
 			},
 		},

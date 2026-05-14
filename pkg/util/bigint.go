@@ -5,6 +5,7 @@ import (
 	"slices"
 )
 
+// BigIntToCsharpByteArray converts a big.Int to C# BigInteger little-endian two's-complement bytes.
 func BigIntToCsharpByteArray(n *big.Int) []byte {
 	if n.BitLen() == 0 { // Check if big int is zero
 		return []byte{0x00}
@@ -31,8 +32,7 @@ func BigIntToCsharpByteArray(n *big.Int) []byte {
 	return bytes
 }
 
-// That's a replication of C# ToSignedByteArray() from BigIntegerExtension.cs
-// Adding Phantasma's additional postfixes
+// BigIntToPhantasmaByteArray converts a big.Int to Phantasma's signed integer byte format.
 func BigIntToPhantasmaByteArray(n *big.Int) []byte {
 	var bytes = BigIntToCsharpByteArray(n)
 
@@ -51,6 +51,7 @@ func BigIntToPhantasmaByteArray(n *big.Int) []byte {
 	return bytes
 }
 
+// BigIntBytesFromCsharpOrPhantasmaByteArray returns magnitude bytes and sign from a signed integer byte slice.
 func BigIntBytesFromCsharpOrPhantasmaByteArray(bytes []byte) ([]byte, int) {
 	n := make([]byte, len(bytes))
 	copy(n, bytes)
@@ -74,6 +75,7 @@ func BigIntBytesFromCsharpOrPhantasmaByteArray(bytes []byte) ([]byte, int) {
 	return n, -1
 }
 
+// BigIntFromCsharpOrPhantasmaByteArray converts C# or Phantasma signed integer bytes to a big.Int.
 func BigIntFromCsharpOrPhantasmaByteArray(bytes []byte) *big.Int {
 	b, sign := BigIntBytesFromCsharpOrPhantasmaByteArray(bytes)
 

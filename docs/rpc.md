@@ -5,11 +5,16 @@
 ## Client
 
 ```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+
 client := rpc.NewRPCTestnet()
 client = rpc.NewRPCMainnet()
 client = rpc.NewRPC("http://localhost:5172/rpc")
-raw, err := client.CallContext(ctx, "getBlockHeight", "main")
+raw, err := client.Call(ctx, "getBlockHeight", "main")
 ```
+
+All typed RPC wrappers are context-first, for example `client.GetAccount(ctx, address)` and `client.SendCarbonTransaction(ctx, txHex)`.
 
 ## Core Calls
 
@@ -50,7 +55,7 @@ The wrapper also includes the Carbon endpoints exposed by the current C#/TS SDKs
 
 Cursor-paginated methods return `response.CursorPaginatedResult[T]`. Page-paginated methods return `response.PaginatedResult[T]`.
 Carbon token/series id filters are numeric (`uint64` for token ids, `uint32` for Carbon series ids). Pass `0` when the RPC endpoint should use its default/no-filter behavior. `GetTokenNFTsWithSeriesID` also accepts a Phantasma Series ID string filter.
-`GetAccounts` accepts variadic addresses and `GetNFTs` accepts slices, then joins them for the wire call. Use `GetAccountsText` or `GetNFTsText` only when you already have the comma-separated RPC string. `WriteArchive` accepts raw bytes; use `WriteArchiveBase64` only when the block is already encoded.
+`GetAccounts` accepts `ctx` followed by variadic addresses and `GetNFTs` accepts `ctx` followed by slices, then joins them for the wire call. Use `GetAccountsText` or `GetNFTsText` only when you already have the comma-separated RPC string. `WriteArchive` accepts raw bytes; use `WriteArchiveBase64` only when the block is already encoded.
 Address-type variants accept `rpc.AddressTypePhantasma` or `rpc.AddressTypeCarbon` for RPC calls where C# exposes explicit Phantasma-vs-Carbon address interpretation.
 
 ## Carbon Broadcast
@@ -61,7 +66,7 @@ if err != nil {
     log.Fatal(err)
 }
 
-hash, err := client.SendCarbonTransaction(signedTx)
+hash, err := client.SendCarbonTransaction(ctx, signedTx)
 if err != nil {
     log.Fatal(err)
 }
@@ -70,7 +75,7 @@ if err != nil {
 For the common sign-and-broadcast flow:
 
 ```go
-hash, err := client.SignAndSendCarbonTransaction(tx, keyPair)
+hash, err := client.SignAndSendCarbonTransaction(ctx, tx, keyPair)
 if err != nil {
     log.Fatal(err)
 }

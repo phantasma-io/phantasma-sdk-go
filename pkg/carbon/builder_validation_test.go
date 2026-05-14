@@ -39,6 +39,37 @@ func TestTokenInfoBuilderValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("valid fungible token rejected: %v", err)
 	}
+	nft, err := BuildTokenInfo("NFT", maxSupply, true, 0, creator, metadata, SerializeTokenSchemas(PrepareStandardTokenSchemas(false)))
+	if err != nil {
+		t.Fatalf("valid NFT token rejected: %v", err)
+	}
+	if nft.Flags != TokenFlagsNonFungible {
+		t.Fatalf("NFT flags = %v, want %v", nft.Flags, TokenFlagsNonFungible)
+	}
+
+	unlimited, err := BuildTokenInfo("UNLIMITED", maxSupply, false, 8, creator, metadata, nil)
+	if err != nil {
+		t.Fatalf("unlimited fungible token rejected: %v", err)
+	}
+	if unlimited.Flags != TokenFlagsBigFungible {
+		t.Fatalf("unlimited fungible flags = %v, want %v", unlimited.Flags, TokenFlagsBigFungible)
+	}
+
+	finiteSmall, err := BuildTokenInfo("SMALL", IntXFromInt64(1_000_000), false, 8, creator, metadata, nil)
+	if err != nil {
+		t.Fatalf("finite small fungible token rejected: %v", err)
+	}
+	if finiteSmall.Flags != TokenFlagsNone {
+		t.Fatalf("finite small fungible flags = %v, want %v", finiteSmall.Flags, TokenFlagsNone)
+	}
+
+	finiteBig, err := BuildTokenInfo("BIG", MustIntXFromString("9223372036854775808"), false, 8, creator, metadata, nil)
+	if err != nil {
+		t.Fatalf("finite big fungible token rejected: %v", err)
+	}
+	if finiteBig.Flags != TokenFlagsBigFungible {
+		t.Fatalf("finite big fungible flags = %v, want %v", finiteBig.Flags, TokenFlagsBigFungible)
+	}
 
 	_, err = BuildTokenInfo("NFT", MustIntXFromString("9223372036854775808"), true, 0, creator, metadata, SerializeTokenSchemas(PrepareStandardTokenSchemas(false)))
 	if err == nil || !strings.Contains(err.Error(), "NFT maximum supply") {

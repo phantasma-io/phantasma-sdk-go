@@ -1,14 +1,18 @@
 package blockchain
 
 import (
+	"fmt"
 	"strings"
 
-	crypto "github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/io"
-	hashing "github.com/phantasma-io/phantasma-go/pkg/util/hashing"
+	crypto "github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
+	hashing "github.com/phantasma-io/phantasma-sdk-go/pkg/util/hashing"
 )
 
-// Transaction a
+// MaxTransactionSignatureCount limits transaction signature allocation while decoding untrusted bytes.
+const MaxTransactionSignatureCount = 1024
+
+// Transaction represents a classic Phantasma VM transaction.
 type Transaction struct {
 
 	// Code to run in PhantasmaVM for this transaction.
@@ -27,7 +31,7 @@ type Transaction struct {
 	Hash crypto.Hash
 }
 
-// NewTransaction creates a new transaction object
+// NewTransaction creates a new transaction object.
 func NewTransaction(nexusName, chainName string, script []byte, timestamp uint32, payload []byte) Transaction {
 
 	tx := Transaction{
@@ -45,7 +49,7 @@ func NewTransaction(nexusName, chainName string, script []byte, timestamp uint32
 	return tx
 }
 
-// updateHash sets the hash of the transaction
+// updateHash sets the hash of the transaction.
 func (tx *Transaction) updateHash() {
 	data := tx.BytesEx(false)
 	bytes := hashing.Sha256(data)
@@ -56,11 +60,12 @@ func (tx *Transaction) updateHash() {
 	tx.Hash = hash
 }
 
-// HasSignatures checks if the transaction was signed already
+// HasSignatures checks if the transaction was signed already.
 func (tx *Transaction) HasSignatures() bool {
 	return len(tx.Signatures) > 0
 }
 
+// SerializeEx writes the transaction with or without the signature section.
 func (tx *Transaction) SerializeEx(writer *io.BinWriter, withSignatures bool) {
 	writer.WriteString(tx.NexusName)
 	writer.WriteString(tx.ChainName)
@@ -87,12 +92,12 @@ func (tx *Transaction) SerializeEx(writer *io.BinWriter, withSignatures bool) {
 	}
 }
 
-// Serialize implements ther Serializable interface
+// Serialize implements the Serializable interface.
 func (tx *Transaction) Serialize(writer *io.BinWriter) {
 	tx.SerializeEx(writer, true)
 }
 
-// Deserialize implements ther Serializable interface
+// Deserialize implements the Serializable interface.
 func (tx *Transaction) Deserialize(reader *io.BinReader) {
 	tx.NexusName = reader.ReadString()
 	tx.ChainName = reader.ReadString()
@@ -100,47 +105,88 @@ func (tx *Transaction) Deserialize(reader *io.BinReader) {
 	tx.Expiration = reader.ReadU32LE()
 	tx.Payload = reader.ReadVarBytes()
 
-	signatureCount := int(reader.ReadVarUint())
-	if signatureCount > 0 {
-		reader.ReadArray(&tx.Signatures, signatureCount)
-	} else {
+	signatureCount := reader.ReadVarUint()
+	if reader.Err != nil {
+		return
+	}
+	if signatureCount > MaxTransactionSignatureCount {
+		reader.Err = fmt.Errorf("transaction signature count is too large: got %d, max %d", signatureCount, MaxTransactionSignatureCount)
+		return
+	}
+
+	if signatureCount == 0 {
 		tx.Signatures = []crypto.Signature{}
+	} else {
+		tx.Signatures = make([]crypto.Signature, 0, signatureCount)
+		for i := uint64(0); i < signatureCount; i++ {
+			signature := deserializeSignature(reader)
+			if reader.Err != nil {
+				return
+			}
+			tx.Signatures = append(tx.Signatures, signature)
+		}
+	}
+
+	if reader.Err != nil {
+		return
 	}
 	tx.updateHash()
 }
 
-// String a
+func deserializeSignature(reader *io.BinReader) crypto.Signature {
+	kind := crypto.SignatureKind(reader.ReadB())
+	if reader.Err != nil {
+		return nil
+	}
+
+	switch kind {
+	case crypto.Ed25519:
+		signature := &crypto.Ed25519Signature{}
+		signature.Deserialize(reader)
+		return signature
+	default:
+		reader.Err = fmt.Errorf("unsupported transaction signature kind: %d", kind)
+		return nil
+	}
+}
+
+// String returns the transaction hash string.
 func (tx *Transaction) String() string {
 	return tx.Hash.String()
 }
 
+// BytesEx returns the serialized transaction with or without signatures.
 func (tx *Transaction) BytesEx(withSignatures bool) []byte {
 	bw := *io.NewBufBinWriter()
 	tx.SerializeEx(bw.BinWriter, withSignatures)
 	return bw.Bytes()
 }
 
-// Bytes a
+// Bytes returns the serialized transaction including signatures.
 func (tx *Transaction) Bytes() []byte {
 	bw := *io.NewBufBinWriter()
 	tx.Serialize(bw.BinWriter)
 	return bw.Bytes()
 }
 
-// Sign the transaction
-func (tx *Transaction) Sign(keyPair crypto.KeyPair) {
+// Sign appends a signature to the transaction.
+func (tx *Transaction) Sign(keyPair crypto.KeyPair) error {
 	if keyPair == nil {
-		panic("KeyPair can't be nil!")
+		return fmt.Errorf("key pair is required")
 	}
 
 	msg := tx.BytesEx(false)
 
-	signature := keyPair.Sign(msg)
+	signature, err := keyPair.Sign(msg)
+	if err != nil {
+		return err
+	}
 
 	tx.Signatures = append(tx.Signatures, signature)
+	return nil
 }
 
-// IsSignedBy checks if a transaction is signed by a specific address
+// IsSignedBy checks if a transaction is signed by a specific address.
 func (tx *Transaction) IsSignedBy(addresses []crypto.Address) bool {
 	if !tx.HasSignatures() {
 		return false
@@ -157,7 +203,7 @@ func (tx *Transaction) IsSignedBy(addresses []crypto.Address) bool {
 	return false
 }
 
-// Mine the transaction with the passed in difficulty
+// Mine searches for a payload nonce that satisfies the requested hash difficulty.
 func (tx *Transaction) Mine(difficulty int) {
 	if difficulty == 0 {
 		return
@@ -184,18 +230,13 @@ func (tx *Transaction) Mine(difficulty int) {
 	}
 }
 
+// TxStateIsSuccess reports whether a transaction VM state is successful.
 func TxStateIsSuccess(state string) bool {
-	if strings.ToUpper(state) == "HALT" {
-		return true
-	} else {
-		return false
-	}
+	return strings.ToUpper(state) == "HALT"
 }
 
+// TxStateIsFault reports whether a transaction VM state is a fault state.
 func TxStateIsFault(state string) bool {
-	if strings.ToUpper(state) == "FAULT" || strings.ToUpper(state) == "BREAK" {
-		return true
-	} else {
-		return false
-	}
+	state = strings.ToUpper(state)
+	return state == "FAULT" || state == "BREAK"
 }

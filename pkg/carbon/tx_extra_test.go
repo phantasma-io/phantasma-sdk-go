@@ -2,10 +2,12 @@ package carbon
 
 import (
 	"encoding/hex"
+	"math/big"
+	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
 )
 
 func TestCarbonTxExtraVectors(t *testing.T) {
@@ -170,8 +172,58 @@ func TestFeeOptionZeroValuesUseDefaults(t *testing.T) {
 	if got, want := (CreateSeriesFeeOptions{}).CalculateMaxGas(), DefaultCreateSeriesFeeOptions().CalculateMaxGas(); got != want {
 		t.Fatalf("zero create-series fees must use defaults: got %d want %d", got, want)
 	}
-	if got, want := (MintNFTFeeOptions{}).CalculateMaxGas(), DefaultMintNFTFeeOptions().CalculateMaxGas(); got != want {
+	if got, want := (MintNFTFeeOptions{}).calculateMaxGasForSingle(), DefaultMintNFTFeeOptions().calculateMaxGasForSingle(); got != want {
 		t.Fatalf("zero mint fees must use defaults: got %d want %d", got, want)
+	}
+}
+
+func TestNFTMintFeeOptionsScaleByCount(t *testing.T) {
+	baseFees := NewFeeOptions(10, 1_000)
+	if got := baseFees.CalculateMaxGas(); got != 10_000 {
+		t.Fatalf("single base fee mismatch: got %d", got)
+	}
+	if got, err := baseFees.CalculateMaxGasForCount(3); err != nil || got != 30_000 {
+		t.Fatalf("counted base fee mismatch: got %d err %v", got, err)
+	}
+
+	mintFees := NewMintNFTFeeOptions(10, 1_000)
+	if got, err := mintFees.CalculateMaxGasForCount(3); err != nil || got != 30_000 {
+		t.Fatalf("counted mint fee mismatch: got %d err %v", got, err)
+	}
+	if _, err := mintFees.CalculateMaxGasForCount(0); err == nil || !strings.Contains(err.Error(), "count must be positive") {
+		t.Fatalf("zero mint count should fail, got %v", err)
+	}
+
+	tokens := []PhantasmaNFTMintInfo{
+		{PhantasmaSeriesID: NewIntX(big.NewInt(1)), ROM: []byte{0x01}},
+		{PhantasmaSeriesID: NewIntX(big.NewInt(2)), ROM: []byte{0x02}},
+		{PhantasmaSeriesID: NewIntX(big.NewInt(3)), ROM: []byte{0x03}},
+	}
+	tx, err := BuildMintPhantasmaNonFungibleTx(42, testSenderPublicKey(t), testReceiverPublicKey(t), tokens, mintFees, 123, 999)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tx.MaxGas != 30_000 {
+		t.Fatalf("multi Phantasma NFT mint max gas mismatch: got %d", tx.MaxGas)
+	}
+	if _, err := BuildMintPhantasmaNonFungibleTx(42, testSenderPublicKey(t), testReceiverPublicKey(t), nil, mintFees, 123, 999); err == nil || !strings.Contains(err.Error(), "count must be positive") {
+		t.Fatalf("empty Phantasma NFT mint should fail, got %v", err)
+	}
+}
+
+func TestFeeOptionMethodShapes(t *testing.T) {
+	// Only count-sensitive fee types should expose count-sensitive helpers.
+	if _, ok := reflect.TypeOf(CreateTokenFeeOptions{}).MethodByName("CalculateMaxGasForCount"); ok {
+		t.Fatalf("create-token fees must not expose count-sensitive max gas")
+	}
+	if _, ok := reflect.TypeOf(CreateSeriesFeeOptions{}).MethodByName("CalculateMaxGasForCount"); ok {
+		t.Fatalf("create-series fees must not expose count-sensitive max gas")
+	}
+	if _, ok := reflect.TypeOf(MintNFTFeeOptions{}).MethodByName("CalculateMaxGas"); ok {
+		t.Fatalf("NFT mint fees must require an explicit count")
+	}
+	if _, ok := reflect.TypeOf(MintNFTFeeOptions{}).MethodByName("CalculateMaxGasForCount"); !ok {
+		t.Fatalf("NFT mint fees must expose count-sensitive max gas")
 	}
 }
 

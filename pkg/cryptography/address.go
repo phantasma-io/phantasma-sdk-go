@@ -3,11 +3,10 @@ package cryptography
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 	"strings"
 
-	"github.com/phantasma-io/phantasma-go/pkg/encoding/base58"
-	"github.com/phantasma-io/phantasma-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/encoding/base58"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 )
 
 // Length is the length of data
@@ -34,10 +33,7 @@ type Address struct {
 	kind AddressKind
 }
 
-var Null []byte = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0}
+var nullAddressBytes = [Length]byte{}
 
 // Text returns (and initializes if needed) raw text representation of the address. For null address it returns nil. In most cases use String() instead to get text address, which returns "NULL" string for null addresses.
 func (a Address) Text() string {
@@ -59,26 +55,29 @@ func (a Address) Text() string {
 	return a.text
 }
 
-// NewAddress returns a new Address object
-func NewAddress(pubKey []byte) Address {
-
+// NewAddress returns a new Address object from raw address bytes.
+func NewAddress(pubKey []byte) (Address, error) {
 	if pubKey == nil {
-		panic("Passed public key can't be nil!")
+		return Address{}, fmt.Errorf("public key is required")
 	}
 
 	if len(pubKey) != Length {
-		panic("publicKey length must be " + strconv.Itoa(Length) + " but length is " + strconv.Itoa(len(pubKey)))
+		return Address{}, fmt.Errorf("public key length must be %d but length is %d", Length, len(pubKey))
 	}
 
 	address := Address{}
-	address.data = pubKey
+	address.data = append([]byte(nil), pubKey...)
 
-	return address
+	return address, nil
 }
 
-// NullAddress returns a new null Address object
+// NullAddress returns a new null Address object.
 func NullAddress() Address {
-	return NewAddress(Null)
+	address, err := NewAddress(nullAddressBytes[:])
+	if err != nil {
+		panic(err)
+	}
+	return address
 }
 
 // FromString creates an instance of an Address from a string
@@ -94,7 +93,10 @@ func FromString(s string) (Address, error) {
 		return Address{}, err
 	}
 
-	address := NewAddress(data)
+	address, err := NewAddress(data)
+	if err != nil {
+		return Address{}, err
+	}
 
 	switch prefix := s[:1]; prefix {
 	case "P":
@@ -136,21 +138,26 @@ func (a Address) IsUser() bool {
 	return a.Kind() == User
 }
 
-// FromKey generates an address from a KeyPair
-func FromKey(keyPair KeyPair) Address {
+// FromKey generates an address from a KeyPair.
+func FromKey(keyPair KeyPair) (Address, error) {
+	if keyPair == nil {
+		return Address{}, fmt.Errorf("key pair is required")
+	}
+
 	data := make([]byte, Length)
 	data[0] = byte(User)
 
-	if len(keyPair.PublicKey()) == 32 {
+	publicKey := keyPair.PublicKey()
+	if len(publicKey) == 32 {
 
-		copy(data[2:], keyPair.PublicKey()[0:32])
+		copy(data[2:], publicKey[0:32])
 
-	} else if len(keyPair.PublicKey()) == 33 {
+	} else if len(publicKey) == 33 {
 
-		copy(data[1:], keyPair.PublicKey()[0:33])
+		copy(data[1:], publicKey[0:33])
 
 	} else {
-		panic("Invalid public key length")
+		return Address{}, fmt.Errorf("public key length must be 32 or 33 bytes but length is %d", len(publicKey))
 	}
 
 	return NewAddress(data)
@@ -184,7 +191,7 @@ func (a Address) Kind() AddressKind {
 	return a.kind
 }
 
-// String creates the a base58 encoded representation of the address including the address prefix
+// String returns the base58 encoded address with its text prefix.
 func (a Address) String() string {
 	if a.IsNull() {
 		return "NULL"
@@ -192,36 +199,50 @@ func (a Address) String() string {
 	return a.Text()
 }
 
-// Bytes returns the data representing an address
+// Bytes returns a copy of the raw address bytes.
 func (a Address) Bytes() []byte {
-	return a.data
+	return append([]byte(nil), a.data...)
 }
 
-// BytesPrefixed returns the data representing an address, including prefix required for binary serialization
+// BytesPrefixed returns address bytes with the length prefix used by binary serialization.
 func (a Address) BytesPrefixed() []byte {
-	return bytes.Join([][]byte{{34}, a.data}, []byte{})
+	prefixed := make([]byte, 1+len(a.data))
+	prefixed[0] = Length
+	copy(prefixed[1:], a.data)
+	return prefixed
 }
 
-func (a *Address) GetPublicKey() []byte {
+// GetPublicKey returns a copy of the Ed25519 public key embedded in a user address.
+func (a *Address) GetPublicKey() ([]byte, error) {
 	if a.data == nil {
-		return []byte{}
+		return []byte{}, nil
 	}
 	if len(a.data) != Length {
-		panic("invalid address byte length")
+		return nil, fmt.Errorf("invalid address byte length: got %d, want %d", len(a.data), Length)
 	}
 
 	p := make([]byte, 32)
 	copy(p, a.data[2:])
 
-	return p
+	return p, nil
 }
 
-// Serialize implements ther Serializable interface
+// Serialize implements the Serializable interface.
 func (a *Address) Serialize(writer *io.BinWriter) {
 	writer.WriteVarBytes(a.data)
 }
 
-// Deserialize implements ther Serializable interface
+// Deserialize implements the Serializable interface.
 func (a *Address) Deserialize(reader *io.BinReader) {
-	a.data = reader.ReadVarBytes()
+	data := reader.ReadVarBytes(Length)
+	if reader.Err != nil {
+		return
+	}
+	if len(data) != Length {
+		reader.Err = fmt.Errorf("invalid address byte length: got %d, want %d", len(data), Length)
+		return
+	}
+	a.data = append([]byte(nil), data...)
+	a.text = ""
+	a.kind = Invalid
 }

@@ -3,7 +3,7 @@ package contract
 import (
 	"math/big"
 
-	"github.com/phantasma-io/phantasma-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 )
 
 type TokenInfusion struct {

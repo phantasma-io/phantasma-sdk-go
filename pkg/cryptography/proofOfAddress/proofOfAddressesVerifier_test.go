@@ -1,12 +1,11 @@
 package proofOfAddress
 
 import (
-	"encoding/hex"
-	"fmt"
+	"strings"
 	"testing"
 
-	hash "github.com/phantasma-io/phantasma-go/pkg/util/hashing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var testMessage string = `I have signed this message with my Phantasma, Ethereum and Neo Legacy signatures to prove that following addresses belong to me and were derived from private key that belongs to me and to confirm my willingness to swap funds across these addresses upon my request. My public addresses are:
@@ -43,22 +42,36 @@ Ethereum signature: 50AEA773BF563991A9BE0F034442FABB5168DB192D123E43F990A38BE290
 Neo Legacy signature: 605AD6099DA4C4E06122CC7A544B0CF18B94D4203B96604F68884996DB78220BF25E82B0CF8EC360FE9FD083D6268B6B441B64812805E9F03F2852EE50397FE6`
 
 func TestProofOfAddressesVerifier(t *testing.T) {
-	v := NewProofOfAddressesVerifier(testMessage)
+	v, err := NewProofOfAddressesVerifier(testMessage)
+	require.NoError(t, err)
 
-	hash := hash.Sha256([]byte(v.SignedMessage))
-	fmt.Printf("Hash: %s\n", hex.EncodeToString(hash))
-
-	success, errorMessage := v.VerifyMessage()
+	success, errorMessage, err := v.VerifyMessage()
+	require.NoError(t, err)
 	assert.Equal(t, true, success)
 	assert.Equal(t, "", errorMessage)
 
-	v = NewProofOfAddressesVerifier(testMessagePhaAddressIncorrect)
-	success, errorMessage = v.VerifyMessage()
+	v, err = NewProofOfAddressesVerifier(testMessagePhaAddressIncorrect)
+	require.NoError(t, err)
+	success, errorMessage, err = v.VerifyMessage()
+	require.NoError(t, err)
 	assert.Equal(t, false, success)
 	assert.Equal(t, "Phantasma signature is incorrect!\nEthereum signature is incorrect!\nNeo Legacy signature is incorrect!\n", errorMessage)
 
-	v = NewProofOfAddressesVerifier(testMessagePhaSignatureIncorrect)
-	success, errorMessage = v.VerifyMessage()
+	v, err = NewProofOfAddressesVerifier(testMessagePhaSignatureIncorrect)
+	require.NoError(t, err)
+	success, errorMessage, err = v.VerifyMessage()
+	require.NoError(t, err)
 	assert.Equal(t, false, success)
 	assert.Equal(t, "Phantasma signature is incorrect!\n", errorMessage)
+}
+
+func TestProofOfAddressesVerifierRejectsMalformedEthereumPublicKey(t *testing.T) {
+	message := strings.Replace(testMessage, "Ethereum public key: 025D3F7F469803C68C12B8F731576C74A9B5308484FD3B425D87C35CAED0A2E398", "Ethereum public key: 010203", 1)
+	v, err := NewProofOfAddressesVerifier(message)
+	require.NoError(t, err)
+
+	success, _, err := v.VerifyMessage()
+	assert.False(t, success)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "public key length")
 }

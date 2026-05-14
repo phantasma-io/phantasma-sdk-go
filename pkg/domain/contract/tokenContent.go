@@ -3,9 +3,9 @@ package contract
 import (
 	"math/big"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/domain/types"
-	"github.com/phantasma-io/phantasma-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain/types"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 )
 
 type TokenContent struct {

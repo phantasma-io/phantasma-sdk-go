@@ -4,8 +4,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/phantasma-io/phantasma-go/pkg/domain/types"
-	sdkio "github.com/phantasma-io/phantasma-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain/types"
+	sdkio "github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 )
 
 func TestEnergyStakeRoundTrip(t *testing.T) {

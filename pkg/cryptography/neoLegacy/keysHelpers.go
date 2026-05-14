@@ -3,7 +3,7 @@ package neoLegacy
 import (
 	"github.com/nspcc-dev/neo-go/pkg/crypto/hash"
 	"github.com/nspcc-dev/neo-go/pkg/util"
-	"github.com/phantasma-io/phantasma-go/pkg/encoding/base58"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/encoding/base58"
 )
 
 // Code below was taken from https://github.com/nspcc-dev/neo-go v0.78.4

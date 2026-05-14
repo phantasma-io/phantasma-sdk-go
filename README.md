@@ -1,5 +1,5 @@
 <p align="center">
-<img src="./.github/phantasma-go.jpg" width="300px" alt="logo">
+<img src="./.github/phantasma-sdk-go.jpg" width="300px" alt="logo">
 </p>
 <p align="center">
   <b>Go</b> SDK for the <a href="https://phantasma.io">Phantasma</a> blockchain.
@@ -7,7 +7,7 @@
 
 <hr />
 
-![License](https://img.shields.io/github/license/phantasma-io/phantasma-go.svg?style=popout)
+![License](https://img.shields.io/github/license/phantasma-io/phantasma-sdk-go.svg?style=popout)
 
 # Overview
 
@@ -19,67 +19,48 @@ This project aims to be an easy to use SDK for the Phantasma blockchain.
 
 Requires Go 1.25 or newer. The module is developed with the Go 1.26 toolchain.
 
-PhantasmaGo is distributed as a library that includes all the functionality provided.
+`phantasma-sdk-go` is distributed as a library that includes all SDK functionality.
 
 ```
-go get -u github.com/phantasma-io/phantasma-go
+go get -u github.com/phantasma-io/phantasma-sdk-go
 ```
 
 ## Getting started
-To start interacting with Phantasma blockchain you need to choose network you are planning to use (mainnet or testnet) and create corresponding RPC client.
+To start interacting with Phantasma blockchain you need to choose the network and create an RPC client. All typed RPC methods take `context.Context` as their first argument so callers can set deadlines and cancellation.
 
-Creation of testnet RPC client:
-```
-client = rpc.NewRPCTestnet()
-```
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
 
-Creation of mainnet RPC client:
-```
-client = rpc.NewRPCMainnet()
+client := rpc.NewRPCTestnet()
+// client := rpc.NewRPCMainnet()
 ```
 
 To create a new key pair structure from private key in WIF format use following code:
-```
+```go
 keyPair, err := cryptography.FromWIF("put WIF here")
 if err != nil {
     log.Fatalf("creating key pair: %v", err)
 }
 ```
 
-To get detailed description of tokens deployed on the chain you can use following code:
+To get detailed description of tokens deployed on the chain and read token characteristics you can use following code:
 
-```
-var chainTokens []response.TokenResult
-
-func getChainToken(symbol string) (response.TokenResult, bool) {
-    for _, t := range chainTokens {
-        if t.Symbol == symbol {
-            return t, true
-        }
-    }
-
-    return response.TokenResult{}, false
-}
-
-chainTokens, err = client.GetTokens(false)
+```go
+chainTokens, err := client.GetTokens(ctx, false)
 if err != nil {
     log.Fatal(err)
 }
-```
 
-This will allow you to get token characteristics this way:
-
-```
-t, ok := getChainToken("SOUL")
-if !ok {
-    log.Fatal("token SOUL not found")
-}
-if t.IsFungible() {
-    fmt.Println("Token SOUL is fungible")
+for _, token := range chainTokens {
+    if token.Symbol == "SOUL" && token.IsFungible() {
+        fmt.Println("Token SOUL is fungible")
+        break
+    }
 }
 ```
 
-Code samples in the following sections of this documentation use `client` and `keyPair` structures and method `getChainToken` which should be initialized in advance.
+Code samples in the following sections of this documentation use `client` and `keyPair` structures which should be initialized in advance.
 
 ## Carbon transactions and token builders
 
@@ -107,7 +88,7 @@ if err != nil {
 schemas := carbon.PrepareStandardTokenSchemas(false)
 rom, err := carbon.BuildNFTRom(schemas.ROM, big.NewInt(1), []carbon.MetadataField{
     {Name: "name", Value: "Example NFT"},
-    {Name: "description", Value: "Minted with phantasma-go Carbon helpers"},
+    {Name: "description", Value: "Minted with phantasma-sdk-go Carbon helpers"},
     {Name: "imageURL", Value: "https://example.com/nft.png"},
     {Name: "infoURL", Value: "https://example.com/nft"},
     {Name: "royalties", Value: int32(0)},
@@ -131,7 +112,7 @@ if err != nil {
     log.Fatal(err)
 }
 
-txHash, err := client.SendCarbonTransaction(signedTx)
+txHash, err := client.SendCarbonTransaction(ctx, signedTx)
 if err != nil {
     log.Fatal(err)
 }
@@ -153,13 +134,25 @@ The RPC client now exposes the Carbon endpoints used by the current C#/TS SDKs. 
 
 Cursor-paginated endpoints return `response.CursorPaginatedResult[T]`.
 Carbon token id filters use `uint64`, Carbon series id filters use `uint32`, and `0` means no Carbon id filter. `GetTokenNFTsWithSeriesID` accepts the Phantasma Series ID string filter exposed by current RPC nodes.
-Use `client.CallContext(ctx, method, params...)` for low-level calls that need request cancellation or deadlines.
+Use `client.Call(ctx, method, params...)` for low-level calls that need request cancellation or deadlines.
+
+## Public package surface
+
+Prefer the high-level packages for application code:
+
+- `pkg/rpc` and `pkg/rpc/response` for node calls and typed RPC results;
+- `pkg/carbon` for Carbon transactions, serialization, token builders, and signing;
+- `pkg/vm/script_builder` for classic VM scripts;
+- `pkg/cryptography` for keys, addresses, signatures, and WIF handling;
+- `pkg/blockchain` for classic VM transaction objects.
+
+Lower-level packages such as `pkg/io`, `pkg/jsonrpc`, `pkg/domain`, and `pkg/vm` remain available for advanced serialization and migration work, but application code should avoid depending on their internals unless it needs that wire-level control.
 
 ## Script Builder
 
-Building a script is the most important part of interacting with the Phantasma blockchain. Without a proper script, the Phantasma blockchain will not know what you are trying to do.
+Building a script is the main entry point for transaction and contract interactions. The script must match the target contract or interop ABI.
 
-These functions, `CallContract` and `CallInterop`, are your bread and butter for creating new scripts.
+The `CallContract` and `CallInterop` methods are the primary entry points for creating scripts.
 
 ```
 func (s ScriptBuilder) CallContract(contractName, method string, args ...interface{}) ScriptBuilder
@@ -169,9 +162,9 @@ func (s ScriptBuilder) CallContract(contractName, method string, args ...interfa
 func (s ScriptBuilder) CallInterop(method string, args ...interface{}) ScriptBuilder
 ```
 
-You can find out all the different `CallInterop` functions below.
+The available `CallInterop` functions are listed below.
 
-For `CallContract`, you will have to look through the ABI's of all the different smart contracts currently deployed on the Phantasma 'mainnet': [Link Here](https://explorer.phantasma.info/en/nexus?tab=contracts). To see all methods of a contract, for example `stake`, you can check it with explorer: [Link Here](https://explorer.phantasma.info/en/contract?id=stake&tab=methods).
+For `CallContract`, inspect the ABIs of the smart contracts currently deployed on Phantasma mainnet: [Explorer contract list](https://explorer.phantasma.info/en/nexus?tab=contracts). To see all methods of a contract, for example `stake`, check the contract methods view: [stake contract methods](https://explorer.phantasma.info/en/contract?id=stake&tab=methods).
 
 The Go builder now resolves labels per instance, emits integer values as VM `Number` payloads, supports array arguments, and matches the C#/TS/C++ shared script vectors.
 Address arguments are intentionally typed as `cryptography.Address` in high-level helpers. Raw `string` arguments passed to `CallContract` or `CallInterop` are emitted as VM strings; use `cryptography.MustAddressFromString(text)` or the `*Text` helpers when the ABI expects a Phantasma address.
@@ -251,33 +244,31 @@ script := sb.EndScript()
 
 ## InvokeRawScript and decoding the result
 
-Scripts which does not require transaction can be sent to the chain directly using `InvokeRawScript()` call.
+Scripts that do not require a transaction can be sent to the chain directly using `InvokeRawScript()`.
 
-Here's an example of such call to get SoulMaster count from the chain:
+Here's a read-only example that gets SOUL token decimals from the chain:
 
-```
+```go
 // Build script
 sb := scriptbuilder.BeginScript().
-    CallContract("stake", "GetMasterCount")
+    CallInterop("Runtime.GetTokenDecimals", "SOUL")
 script := sb.EndScript()
 
 // Before sending script to the chain we need to encode it into Base16 encoding (HEX)
-encodedScript := hex.EncodeToString(script)
+encodedScript := fmt.Sprintf("%x", script)
 
 // Make the call itself
-result, err := client.InvokeRawScript("main", encodedScript)
+result, err := client.InvokeRawScript(ctx, "main", encodedScript)
 
 if err != nil {
     log.Fatalf("script invocation failed: %v", err)
 }
 
-// `DecodeResultWithError()` decodes HEX-encoded byte array result, stored in `.Result` field, into `vm.VMObject` structure
-// `AsNumber()` returns value stored in `vm.VMObject` structure, in `.Data` field, as a *big.Int number (in our case value is stored in `vm.VMObject` as big integer serialized into byte array)
 value, err := result.DecodeResultWithError()
 if err != nil {
     log.Fatalf("script result decoding failed: %v", err)
 }
-fmt.Println("Current SoulMasters count: ", value.AsNumber().String())
+fmt.Println("SOUL decimals:", value.AsNumber().String())
 ```
 
 ## Building and sending transaction
@@ -300,7 +291,9 @@ expire := time.Now().UTC().Add(time.Second * time.Duration(30)).Unix()
 tx := blockchain.NewTransaction(netSelected, "main", script, uint32(expire), domain.SDKPayload)
 
 // Sign transaction
-tx.Sign(keyPair)
+if err := tx.Sign(keyPair); err != nil {
+    log.Fatal(err)
+}
 
 // Before sending script to the chain we need to encode it into Base16 encoding (HEX)
 txHex := hex.EncodeToString(tx.Bytes())
@@ -308,10 +301,10 @@ txHex := hex.EncodeToString(tx.Bytes())
 
 ### Sending transaction
 
-Here we send transaction prepared in previous block of code and stored as HEX in `txHex` variable.
+Broadcasting requires a funded key and sends a transaction to the selected network. Keep broadcast examples separate from read-only examples and only run them intentionally.
 
 ```
-txHash, err := client.SendRawTransaction(txHex)
+txHash, err := client.SendRawTransaction(ctx, txHex)
 if err != nil {
     log.Fatalf("broadcasting tx failed: %v", err)
 } else {
@@ -329,7 +322,7 @@ We need to wait for transaction to be minted on the chain to get its status:
 
 ```
 for {
-    txResult, _ := client.GetTransaction(txHash)
+    txResult, _ := client.GetTransaction(ctx, txHash)
 
     if txResult.StateIsSuccess() {
         fmt.Println("Transaction was successfully minted, tx hash: " + fmt.Sprint(txResult.Hash))
@@ -361,12 +354,14 @@ expire := time.Now().UTC().Add(time.Second * time.Duration(30)).Unix()
 tx := chain.NewTransaction(netSelected, "main", script, uint32(expire), domain.SDKPayload)
 
 // Sign transaction
-tx.Sign(keyPair)
+if err := tx.Sign(keyPair); err != nil {
+    log.Fatal(err)
+}
 
 // Before sending script to the chain we need to encode it into Base16 encoding (HEX)
 txHex := hex.EncodeToString(tx.Bytes())
 
-txHash, err := client.SendRawTransaction(txHex)
+txHash, err := client.SendRawTransaction(ctx, txHex)
 if err != nil {
     log.Fatalf("broadcasting tx failed: %v", err)
 } else {
@@ -378,7 +373,7 @@ if err != nil {
 }
 
 for {
-    txResult, _ := client.GetTransaction(txHash)
+    txResult, _ := client.GetTransaction(ctx, txHash)
 
     if txResult.StateIsSuccess() {
         fmt.Println("Transaction was successfully minted, tx hash: " + fmt.Sprint(txResult.Hash))
@@ -404,11 +399,11 @@ func onTransactionReceived(address, symbol, amount string) {
 
 func waitForIncomingTransfers(address string) {
     // Get current block height
-    height, _ := client.GetBlockHeight("main")
+    height, _ := client.GetBlockHeight(ctx, "main")
 
     for {
         // Get block's data by its height
-        block, err := client.GetBlockByHeight("main", height.String())
+        block, err := client.GetBlockByHeight(ctx, "main", height.String())
         if err != nil {
             log.Fatalf("GetBlockByHeight failed: %v", err)
         }
@@ -445,7 +440,7 @@ func waitForIncomingTransfers(address string) {
 
         // Wait for next block to appear on the blockchain
         for {
-            newHeight, _ := client.GetBlockHeight("main")
+            newHeight, _ := client.GetBlockHeight(ctx, "main")
             if newHeight.Cmp(height) == 1 {
                 // New block was minted (at least 1 new block)
                 height = height.Add(height, big.NewInt(1))

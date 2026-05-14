@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
 )
 
 // SignTxMsg signs a Carbon transaction message with a single witness.

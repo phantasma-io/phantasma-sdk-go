@@ -4,25 +4,31 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"fmt"
-	"strconv"
 
-	"github.com/phantasma-io/phantasma-go/pkg/encoding/base58"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/encoding/base58"
 )
 
-// KeyPair a
+const (
+	wifVersion          = byte(0x80)
+	wifCompressedSuffix = byte(0x01)
+)
+
+// KeyPair signs Phantasma messages and exposes the public identity associated
+// with the private key. Byte slices returned by implementations must be copies
+// so callers cannot mutate key material owned by the SDK.
 type KeyPair interface {
 	PrivateKey() []byte
 	ExpandedPrivateKey() []byte
 	PublicKey() []byte
 	Address() Address
 
-	Sign(msg []byte) Signature
+	Sign(msg []byte) (Signature, error)
 }
 
-// PrivateKeyLength defines the length of a private key
+// PrivateKeyLength defines the length of a private key seed.
 const PrivateKeyLength = 32
 
-// PhantasmaKeys is the struct that holds the information about keys for the phantasma blockchain
+// PhantasmaKeys holds the Ed25519 key material used by Phantasma accounts.
 type PhantasmaKeys struct {
 	privateKey         []byte
 	expandedPrivateKey []byte
@@ -30,33 +36,36 @@ type PhantasmaKeys struct {
 	address            Address
 }
 
-// NewPhantasmaKeys instantiates a new PhantasmaKeys object based on the given seed
-func NewPhantasmaKeys(seed []byte) PhantasmaKeys {
-
+// NewPhantasmaKeys instantiates a new PhantasmaKeys object based on the given seed.
+func NewPhantasmaKeys(seed []byte) (PhantasmaKeys, error) {
 	if len(seed) != PrivateKeyLength {
-		panic("Length of private key has not been met, needs to be " + strconv.Itoa(PrivateKeyLength))
+		return PhantasmaKeys{}, fmt.Errorf("private key seed length must be %d but length is %d", PrivateKeyLength, len(seed))
 	}
 
 	keys := PhantasmaKeys{}
 	pk := ed25519.NewKeyFromSeed(seed)
-	keys.publicKey = pk[32:]
-	keys.privateKey = pk[:32]
-	keys.expandedPrivateKey = pk[:]
-	keys.address = FromKey(keys)
+	keys.publicKey = append([]byte(nil), pk[32:]...)
+	keys.privateKey = append([]byte(nil), pk[:32]...)
+	keys.expandedPrivateKey = append([]byte(nil), pk...)
+	address, err := FromKey(keys)
+	if err != nil {
+		return PhantasmaKeys{}, err
+	}
+	keys.address = address
 
-	return keys
+	return keys, nil
 }
 
-// GeneratePhantasmaKeys creates a new phantasma keypair
-func GeneratePhantasmaKeys() PhantasmaKeys {
-
+// GeneratePhantasmaKeys creates a new Phantasma keypair.
+func GeneratePhantasmaKeys() (PhantasmaKeys, error) {
 	seed := make([]byte, PrivateKeyLength)
-	rand.Read(seed)
-	keys := NewPhantasmaKeys(seed)
-	return keys
+	if _, err := rand.Read(seed); err != nil {
+		return PhantasmaKeys{}, err
+	}
+	return NewPhantasmaKeys(seed)
 }
 
-// FromWIF creates a new key pair based on the passed in WIF
+// FromWIF creates a new key pair from a Bitcoin-style WIF private key.
 func FromWIF(wif string) (PhantasmaKeys, error) {
 
 	if len(wif) == 0 {
@@ -68,50 +77,63 @@ func FromWIF(wif string) (PhantasmaKeys, error) {
 		return PhantasmaKeys{}, err
 	}
 
+	if len(data) != PrivateKeyLength+1 && len(data) != PrivateKeyLength+2 {
+		return PhantasmaKeys{}, fmt.Errorf("invalid WIF payload length: got %d, want %d or %d", len(data), PrivateKeyLength+1, PrivateKeyLength+2)
+	}
+	if data[0] != wifVersion {
+		return PhantasmaKeys{}, fmt.Errorf("invalid WIF version: got 0x%02x, want 0x%02x", data[0], wifVersion)
+	}
+	if len(data) == PrivateKeyLength+2 && data[PrivateKeyLength+1] != wifCompressedSuffix {
+		return PhantasmaKeys{}, fmt.Errorf("invalid compressed WIF suffix: got 0x%02x, want 0x%02x", data[PrivateKeyLength+1], wifCompressedSuffix)
+	}
+
 	privateKey := make([]byte, PrivateKeyLength)
 	copy(privateKey[0:], data[1:33])
 
-	keys := NewPhantasmaKeys(privateKey)
-	return keys, nil
+	return NewPhantasmaKeys(privateKey)
 }
 
 func (k PhantasmaKeys) String() string {
 	return k.address.String()
 }
 
-// Sign generates a signature for the passed in message
-func (k PhantasmaKeys) Sign(msg []byte) Signature {
-	return Generate(k, msg)
+// Sign generates a signature for the passed in message.
+func (k PhantasmaKeys) Sign(msg []byte) (Signature, error) {
+	signature, err := signEd25519(k, msg)
+	if err != nil {
+		return nil, err
+	}
+	return signature, nil
 }
 
-// WIF returns the WIF based on the private key
+// WIF returns the compressed WIF representation of the private key.
 func (k PhantasmaKeys) WIF() string {
 	bytes := make([]byte, PrivateKeyLength+2)
-	bytes[0] = 0x80
+	bytes[0] = wifVersion
 
 	copy(bytes[1:], k.PrivateKey()[0:32])
-	bytes[33] = 0x01
+	bytes[33] = wifCompressedSuffix
 	encoded := base58.CheckEncode(bytes)
 
 	return string(encoded)
 }
 
-// ExpandedPrivateKey returns the associated expanded private key
+// ExpandedPrivateKey returns a copy of the Ed25519 expanded private key.
 func (k PhantasmaKeys) ExpandedPrivateKey() []byte {
-	return k.expandedPrivateKey
+	return append([]byte(nil), k.expandedPrivateKey...)
 }
 
-// PrivateKey returns the associated private key
+// PrivateKey returns a copy of the private key seed.
 func (k PhantasmaKeys) PrivateKey() []byte {
-	return k.privateKey
+	return append([]byte(nil), k.privateKey...)
 }
 
-// PublicKey returns the associated public key
+// PublicKey returns a copy of the public key.
 func (k PhantasmaKeys) PublicKey() []byte {
-	return k.publicKey
+	return append([]byte(nil), k.publicKey...)
 }
 
-// Address returns the associated address
+// Address returns the associated address.
 func (k PhantasmaKeys) Address() Address {
 	return k.address
 }

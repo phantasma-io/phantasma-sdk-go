@@ -1,22 +1,22 @@
 package cryptography
 
-import "github.com/phantasma-io/phantasma-go/pkg/io"
+import "github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 
-// SignatureKind type
+// SignatureKind identifies the signature algorithm encoded in a transaction.
 type SignatureKind uint
 
 const (
-	// None Signature
+	// None means no signature algorithm is present.
 	None SignatureKind = iota
-	// Ed25519 Signature
+	// Ed25519 identifies Phantasma Ed25519 signatures.
 	Ed25519
-	// ECDSA Signature
+	// ECDSA identifies ECDSA signatures.
 	ECDSA
-	// Ring Signature
+	// Ring identifies ring signatures.
 	Ring
 )
 
-// Signature a
+// Signature is the common interface for transaction signatures.
 type Signature interface {
 	Kind() SignatureKind
 	Verify(message []byte, addresses []Address) bool

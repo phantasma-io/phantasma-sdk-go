@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	sdkio "github.com/phantasma-io/phantasma-go/pkg/io"
+	sdkio "github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 )
 
 func TestEventKindHelpers(t *testing.T) {

@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	chain "github.com/phantasma-io/phantasma-go/pkg/blockchain"
-	"github.com/phantasma-io/phantasma-go/pkg/io"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
-	"github.com/phantasma-io/phantasma-go/pkg/vm"
+	chain "github.com/phantasma-io/phantasma-sdk-go/pkg/blockchain"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/vm"
 )
 
 // ErrorResult is returned by endpoints that encode failures inside the result object.

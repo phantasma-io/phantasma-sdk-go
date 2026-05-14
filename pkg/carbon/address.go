@@ -3,7 +3,7 @@ package carbon
 import (
 	"fmt"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
 )
 
 var (

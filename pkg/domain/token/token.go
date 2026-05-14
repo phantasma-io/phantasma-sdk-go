@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"slices"
 
-	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/domain/contract"
-	"github.com/phantasma-io/phantasma-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain/contract"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 )
 
 type TokenFlags uint

@@ -8,8 +8,8 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/phantasma-io/phantasma-go/pkg/domain/types"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain/types"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
 )
 
 // MaxArraySize is the maximum size of an array which can be decoded.
@@ -183,6 +183,8 @@ func (r *BinReader) ReadBigInteger() *big.Int {
 	return util.BigIntFromCsharpOrPhantasmaByteArray(b)
 }
 
+// ReadBigIntegerToString reads a big integer and returns its base-10 decimal
+// representation.
 func (r *BinReader) ReadBigIntegerToString() string {
 	if r.Err != nil {
 		return big.NewInt(0).String()

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	hash "github.com/phantasma-io/phantasma-go/pkg/util/hashing"
+	hash "github.com/phantasma-io/phantasma-sdk-go/pkg/util/hashing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -93,31 +93,31 @@ func TestEcdsaSecp256k1Signing(t *testing.T) {
 	assert.Equal(t, true, verificationResult3)
 	assert.Equal(t, true, verificationResult4)
 
-	verificationIncorrect1, err := Verify([]byte(testMessage), []byte(k1SignatureIncorrect1), pubKeyBytesCompressed, Secp256k1)
+	verificationIncorrect1, err := Verify([]byte(testMessage), mustDecodeHex(k1SignatureIncorrect1), pubKeyBytesCompressed, Secp256k1)
 	if err != nil {
 		panic(err)
 	}
 	assert.Equal(t, false, verificationIncorrect1)
 
-	verificationIncorrect2, err := Verify([]byte(testMessage), []byte(k1SignatureIncorrect2), pubKeyBytesCompressed, Secp256k1)
+	verificationIncorrect2, err := Verify([]byte(testMessage), mustDecodeHex(k1SignatureIncorrect2), pubKeyBytesCompressed, Secp256k1)
 	if err != nil {
 		panic(err)
 	}
 	assert.Equal(t, false, verificationIncorrect2)
 
-	verificationIncorrect3, err := Verify([]byte(testMessage), []byte(k1SignatureIncorrect3), pubKeyBytesCompressed, Secp256k1)
+	verificationIncorrect3, err := Verify([]byte(testMessage), mustDecodeHex(k1SignatureIncorrect3), pubKeyBytesCompressed, Secp256k1)
 	if err != nil {
 		panic(err)
 	}
 	assert.Equal(t, false, verificationIncorrect3)
 
-	verificationIncorrect4, err := Verify([]byte(testMessage), []byte(k1SignatureIncorrect4), pubKeyBytesCompressed, Secp256k1)
+	verificationIncorrect4, err := Verify([]byte(testMessage), mustDecodeHex(k1SignatureIncorrect4), pubKeyBytesCompressed, Secp256k1)
 	if err != nil {
 		panic(err)
 	}
 	assert.Equal(t, false, verificationIncorrect4)
 
-	verificationIncorrect5, err := Verify([]byte(testMessage), []byte(k1SignatureIncorrect5), pubKeyBytesCompressed, Secp256k1)
+	verificationIncorrect5, err := Verify([]byte(testMessage), mustDecodeHex(k1SignatureIncorrect5), pubKeyBytesCompressed, Secp256k1)
 	if err != nil {
 		panic(err)
 	}
@@ -171,4 +171,18 @@ func TestEcdsaSecp256r1Signing(t *testing.T) {
 	assert.Equal(t, true, verificationResult1)
 	assert.Equal(t, true, verificationResult2)
 	assert.Equal(t, true, verificationResult3)
+}
+
+func TestEcdsaVerifyRejectsMalformedInput(t *testing.T) {
+	ok, err := Verify([]byte(testMessage), []byte{1, 2, 3}, []byte{1, 2, 3}, Secp256k1)
+	assert.False(t, ok)
+	assert.Error(t, err)
+}
+
+func mustDecodeHex(text string) []byte {
+	bytes, err := hex.DecodeString(text)
+	if err != nil {
+		panic(err)
+	}
+	return bytes
 }

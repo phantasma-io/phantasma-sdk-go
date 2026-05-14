@@ -1,6 +1,6 @@
-# Roadmap for phantasma-go
+# Roadmap for phantasma-sdk-go
 
-This defines approximate plan of phantasma-go releases and key features planned for
+This defines approximate plan of phantasma-sdk-go releases and key features planned for
 them. Things can change if there a need to push a bugfix or some critical
 functionality.
 

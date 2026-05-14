@@ -2,12 +2,13 @@ package io
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math/big"
 	"reflect"
 
-	"github.com/phantasma-io/phantasma-go/pkg/domain/types"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/domain/types"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
 )
 
 // BinWriter is a convenient wrapper around a io.Writer and err object.
@@ -155,13 +156,18 @@ func (w *BinWriter) WriteBigInteger(n *big.Int) {
 	w.WriteVarBytes(b)
 }
 
+// WriteBigIntegerFromString writes a base-10 decimal integer string in binary
+// form into the underlying io.Writer.
 func (w *BinWriter) WriteBigIntegerFromString(n string) {
 	if w.Err != nil {
 		return
 	}
 
 	bi := big.NewInt(0)
-	bi.SetString(n, 10)
+	if _, ok := bi.SetString(n, 10); !ok {
+		w.Err = fmt.Errorf("invalid decimal integer %q", n)
+		return
+	}
 
 	w.WriteBigInteger(bi)
 }

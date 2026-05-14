@@ -1,8 +1,8 @@
 package contract
 
 import (
-	"github.com/phantasma-io/phantasma-go/pkg/io"
-	"github.com/phantasma-io/phantasma-go/pkg/vm"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/vm"
 )
 
 type ContractEvent struct {

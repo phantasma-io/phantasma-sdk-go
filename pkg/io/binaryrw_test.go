@@ -523,3 +523,9 @@ func TestBinRW_ReadWriteNegativeNumber(t *testing.T) {
 	readWriteNumberTest(t, "-257")
 	readWriteNumberTest(t, "-99999999999999999999999999999999999999999999999999")
 }
+
+func TestWriteBigIntegerFromStringRejectsInvalidDecimal(t *testing.T) {
+	w := NewBufBinWriter()
+	w.WriteBigIntegerFromString("not-a-number")
+	require.Error(t, w.Err)
+}
