@@ -58,12 +58,16 @@ func NewRPC(endpoint string) PhantasmaRPC {
 	return rpc
 }
 
-// CallContext performs a low-level JSON-RPC call with caller-supplied context.
-func (rpc PhantasmaRPC) CallContext(ctx context.Context, method string, params ...interface{}) (*jsonrpc.RPCResponse, error) {
+// Call performs a low-level JSON-RPC call with caller-supplied context.
+func (rpc PhantasmaRPC) Call(ctx context.Context, method string, params ...interface{}) (*jsonrpc.RPCResponse, error) {
+	return rpc.client.Call(normalizeContext(ctx), method, params...)
+}
+
+func normalizeContext(ctx context.Context) context.Context {
 	if ctx == nil {
-		ctx = context.Background()
+		return context.Background()
 	}
-	return rpc.client.Call(ctx, method, params...)
+	return ctx
 }
 
 func checkError(result *jsonrpc.RPCResponse, err error) error {
@@ -82,8 +86,8 @@ func checkError(result *jsonrpc.RPCResponse, err error) error {
 	return nil
 }
 
-func (rpc PhantasmaRPC) callObject(out interface{}, method string, params ...interface{}) error {
-	result, err := rpc.client.Call(context.Background(), method, params...)
+func (rpc PhantasmaRPC) callObject(ctx context.Context, out interface{}, method string, params ...interface{}) error {
+	result, err := rpc.client.Call(normalizeContext(ctx), method, params...)
 	if err := checkError(result, err); err != nil {
 		return err
 	}
@@ -91,8 +95,8 @@ func (rpc PhantasmaRPC) callObject(out interface{}, method string, params ...int
 	return result.GetObject(out)
 }
 
-func (rpc PhantasmaRPC) callString(method string, params ...interface{}) (string, error) {
-	result, err := rpc.client.Call(context.Background(), method, params...)
+func (rpc PhantasmaRPC) callString(ctx context.Context, method string, params ...interface{}) (string, error) {
+	result, err := rpc.client.Call(normalizeContext(ctx), method, params...)
 	if err := checkError(result, err); err != nil {
 		return "", err
 	}
@@ -100,8 +104,8 @@ func (rpc PhantasmaRPC) callString(method string, params ...interface{}) (string
 	return result.GetString()
 }
 
-func (rpc PhantasmaRPC) callBool(method string, params ...interface{}) (bool, error) {
-	result, err := rpc.client.Call(context.Background(), method, params...)
+func (rpc PhantasmaRPC) callBool(ctx context.Context, method string, params ...interface{}) (bool, error) {
+	result, err := rpc.client.Call(normalizeContext(ctx), method, params...)
 	if err := checkError(result, err); err != nil {
 		return false, err
 	}
@@ -121,8 +125,8 @@ func (rpc PhantasmaRPC) callBool(method string, params ...interface{}) (bool, er
 	return value, nil
 }
 
-func (rpc PhantasmaRPC) callInt(method string, params ...interface{}) (int, error) {
-	result, err := rpc.client.Call(context.Background(), method, params...)
+func (rpc PhantasmaRPC) callInt(ctx context.Context, method string, params ...interface{}) (int, error) {
+	result, err := rpc.client.Call(normalizeContext(ctx), method, params...)
 	if err := checkError(result, err); err != nil {
 		return 0, err
 	}
@@ -149,9 +153,9 @@ func (rpc PhantasmaRPC) callInt(method string, params ...interface{}) (int, erro
 }
 
 // GetPlatforms returns the platforms known by the connected node.
-func (rpc PhantasmaRPC) GetPlatforms() ([]resp.PlatformResult, error) {
+func (rpc PhantasmaRPC) GetPlatforms(ctx context.Context) ([]resp.PlatformResult, error) {
 	var platforms []resp.PlatformResult
-	result, err := rpc.client.Call(context.Background(), "getPlatforms", []interface{}{})
+	result, err := rpc.client.Call(normalizeContext(ctx), "getPlatforms", []interface{}{})
 
 	if err := checkError(result, err); err != nil {
 		return []resp.PlatformResult{}, err
@@ -166,14 +170,14 @@ func (rpc PhantasmaRPC) GetPlatforms() ([]resp.PlatformResult, error) {
 }
 
 // GetAccounts returns account records for one or more addresses.
-func (rpc PhantasmaRPC) GetAccounts(addresses ...string) ([]resp.AccountResult, error) {
-	return rpc.GetAccountsText(strings.Join(addresses, ","))
+func (rpc PhantasmaRPC) GetAccounts(ctx context.Context, addresses ...string) ([]resp.AccountResult, error) {
+	return rpc.GetAccountsText(ctx, strings.Join(addresses, ","))
 }
 
 // GetAccountsText returns account records for a comma-separated address list.
-func (rpc PhantasmaRPC) GetAccountsText(addresses string) ([]resp.AccountResult, error) {
+func (rpc PhantasmaRPC) GetAccountsText(ctx context.Context, addresses string) ([]resp.AccountResult, error) {
 	var accounts []resp.AccountResult
-	result, err := rpc.client.Call(context.Background(), "getAccounts", addresses, false)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getAccounts", addresses, false)
 
 	if err := checkError(result, err); err != nil {
 		return []resp.AccountResult{}, err
@@ -188,17 +192,17 @@ func (rpc PhantasmaRPC) GetAccountsText(addresses string) ([]resp.AccountResult,
 }
 
 // GetAccountsWithAddressType returns account records for addresses of the same address type.
-func (rpc PhantasmaRPC) GetAccountsWithAddressType(addresses []string, extended bool, checkAddressReservedByte bool, addressType AddressType) ([]resp.AccountResult, error) {
+func (rpc PhantasmaRPC) GetAccountsWithAddressType(ctx context.Context, addresses []string, extended bool, checkAddressReservedByte bool, addressType AddressType) ([]resp.AccountResult, error) {
 	var accounts []resp.AccountResult
-	if err := rpc.callObject(&accounts, "getAccounts", strings.Join(addresses, ","), extended, checkAddressReservedByte, addressType); err != nil {
+	if err := rpc.callObject(ctx, &accounts, "getAccounts", strings.Join(addresses, ","), extended, checkAddressReservedByte, addressType); err != nil {
 		return []resp.AccountResult{}, err
 	}
 	return accounts, nil
 }
 
 // LookupName resolves a registered name into an address.
-func (rpc PhantasmaRPC) LookupName(name string) (string, error) {
-	result, err := rpc.client.Call(context.Background(), "lookUpName", name)
+func (rpc PhantasmaRPC) LookupName(ctx context.Context, name string) (string, error) {
+	result, err := rpc.client.Call(normalizeContext(ctx), "lookUpName", name)
 
 	if err := checkError(result, err); err != nil {
 		return "", err
@@ -213,9 +217,9 @@ func (rpc PhantasmaRPC) LookupName(name string) (string, error) {
 }
 
 // GetAccount returns the current state of an account without the full transaction list.
-func (rpc PhantasmaRPC) GetAccount(address string) (resp.AccountResult, error) {
+func (rpc PhantasmaRPC) GetAccount(ctx context.Context, address string) (resp.AccountResult, error) {
 	var account resp.AccountResult
-	result, err := rpc.client.Call(context.Background(), "getAccount", address, false)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getAccount", address, false)
 
 	if err := checkError(result, err); err != nil {
 		return resp.AccountResult{}, err
@@ -230,18 +234,18 @@ func (rpc PhantasmaRPC) GetAccount(address string) (resp.AccountResult, error) {
 }
 
 // GetAccountWithAddressType returns account state for an address with explicit address interpretation.
-func (rpc PhantasmaRPC) GetAccountWithAddressType(address string, extended bool, checkAddressReservedByte bool, addressType AddressType) (resp.AccountResult, error) {
+func (rpc PhantasmaRPC) GetAccountWithAddressType(ctx context.Context, address string, extended bool, checkAddressReservedByte bool, addressType AddressType) (resp.AccountResult, error) {
 	var account resp.AccountResult
-	if err := rpc.callObject(&account, "getAccount", address, extended, checkAddressReservedByte, addressType); err != nil {
+	if err := rpc.callObject(ctx, &account, "getAccount", address, extended, checkAddressReservedByte, addressType); err != nil {
 		return resp.AccountResult{}, err
 	}
 	return account, nil
 }
 
 // GetAddressTransactions returns transactions for an address, ordered from newer to older.
-func (rpc PhantasmaRPC) GetAddressTransactions(address string, page int, pageSize int) (resp.PaginatedResult[resp.AddressTransactionsResult], error) {
+func (rpc PhantasmaRPC) GetAddressTransactions(ctx context.Context, address string, page int, pageSize int) (resp.PaginatedResult[resp.AddressTransactionsResult], error) {
 	var addressTxs resp.PaginatedResult[resp.AddressTransactionsResult]
-	result, err := rpc.client.Call(context.Background(), "getAddressTransactions", address, page, pageSize)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getAddressTransactions", address, page, pageSize)
 
 	if err := checkError(result, err); err != nil {
 		return resp.PaginatedResult[resp.AddressTransactionsResult]{}, err
@@ -256,9 +260,9 @@ func (rpc PhantasmaRPC) GetAddressTransactions(address string, page int, pageSiz
 }
 
 // GetAddressTransactionCount returns the number of transactions for an address.
-func (rpc PhantasmaRPC) GetAddressTransactionCount(address string, chainName string) (int, error) {
+func (rpc PhantasmaRPC) GetAddressTransactionCount(ctx context.Context, address string, chainName string) (int, error) {
 	var count int
-	result, err := rpc.client.Call(context.Background(), "getAddressTransactionCount", address, chainName)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getAddressTransactionCount", address, chainName)
 
 	if err := checkError(result, err); err != nil {
 		return 0, err
@@ -273,9 +277,9 @@ func (rpc PhantasmaRPC) GetAddressTransactionCount(address string, chainName str
 }
 
 // GetBlockByHeight returns a block by chain and height.
-func (rpc PhantasmaRPC) GetBlockByHeight(chain string, height string) (resp.BlockResult, error) {
+func (rpc PhantasmaRPC) GetBlockByHeight(ctx context.Context, chain string, height string) (resp.BlockResult, error) {
 	var blockResult resp.BlockResult
-	result, err := rpc.client.Call(context.Background(), "getBlockByHeight", chain, height)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getBlockByHeight", chain, height)
 
 	if err := checkError(result, err); err != nil {
 		return resp.BlockResult{}, err
@@ -295,9 +299,9 @@ func (rpc PhantasmaRPC) GetBlockByHeight(chain string, height string) (resp.Bloc
 }
 
 // GetBlockHeight Returns height of the latest block minted on the chain
-func (rpc PhantasmaRPC) GetBlockHeight(chainName string) (*big.Int, error) {
+func (rpc PhantasmaRPC) GetBlockHeight(ctx context.Context, chainName string) (*big.Int, error) {
 	var resultValue string
-	result, err := rpc.client.Call(context.Background(), "getBlockHeight", chainName)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getBlockHeight", chainName)
 
 	if err := checkError(result, err); err != nil {
 		return big.NewInt(0), err
@@ -316,51 +320,51 @@ func (rpc PhantasmaRPC) GetBlockHeight(chainName string) (*big.Int, error) {
 }
 
 // GetBlockTransactionCountByHash returns transaction count for a main-chain block hash.
-func (rpc PhantasmaRPC) GetBlockTransactionCountByHash(blockHash string) (int, error) {
-	return rpc.callInt("getBlockTransactionCountByHash", "main", blockHash)
+func (rpc PhantasmaRPC) GetBlockTransactionCountByHash(ctx context.Context, blockHash string) (int, error) {
+	return rpc.callInt(ctx, "getBlockTransactionCountByHash", "main", blockHash)
 }
 
 // GetBlockTransactionCountByHashOnChain returns transaction count for a block hash on a specific chain.
-func (rpc PhantasmaRPC) GetBlockTransactionCountByHashOnChain(chainAddressOrName string, blockHash string) (int, error) {
-	return rpc.callInt("getBlockTransactionCountByHash", chainAddressOrName, blockHash)
+func (rpc PhantasmaRPC) GetBlockTransactionCountByHashOnChain(ctx context.Context, chainAddressOrName string, blockHash string) (int, error) {
+	return rpc.callInt(ctx, "getBlockTransactionCountByHash", chainAddressOrName, blockHash)
 }
 
 // GetBlockByHash returns a block by hash.
-func (rpc PhantasmaRPC) GetBlockByHash(blockHash string) (resp.BlockResult, error) {
+func (rpc PhantasmaRPC) GetBlockByHash(ctx context.Context, blockHash string) (resp.BlockResult, error) {
 	var blockResult resp.BlockResult
-	if err := rpc.callObject(&blockResult, "getBlockByHash", blockHash); err != nil {
+	if err := rpc.callObject(ctx, &blockResult, "getBlockByHash", blockHash); err != nil {
 		return resp.BlockResult{}, err
 	}
 	return blockResult, nil
 }
 
 // GetLatestBlock returns the latest block for the given chain.
-func (rpc PhantasmaRPC) GetLatestBlock(chainAddressOrName string) (resp.BlockResult, error) {
+func (rpc PhantasmaRPC) GetLatestBlock(ctx context.Context, chainAddressOrName string) (resp.BlockResult, error) {
 	var blockResult resp.BlockResult
-	if err := rpc.callObject(&blockResult, "getLatestBlock", chainAddressOrName); err != nil {
+	if err := rpc.callObject(ctx, &blockResult, "getLatestBlock", chainAddressOrName); err != nil {
 		return resp.BlockResult{}, err
 	}
 	return blockResult, nil
 }
 
 // GetTransactionByBlockHashAndIndex returns a main-chain transaction by block hash and transaction index.
-func (rpc PhantasmaRPC) GetTransactionByBlockHashAndIndex(blockHash string, index int) (resp.TransactionResult, error) {
-	return rpc.GetTransactionByBlockHashAndIndexOnChain("main", blockHash, index)
+func (rpc PhantasmaRPC) GetTransactionByBlockHashAndIndex(ctx context.Context, blockHash string, index int) (resp.TransactionResult, error) {
+	return rpc.GetTransactionByBlockHashAndIndexOnChain(ctx, "main", blockHash, index)
 }
 
 // GetTransactionByBlockHashAndIndexOnChain returns a transaction by chain, block hash and transaction index.
-func (rpc PhantasmaRPC) GetTransactionByBlockHashAndIndexOnChain(chainAddressOrName string, blockHash string, index int) (resp.TransactionResult, error) {
+func (rpc PhantasmaRPC) GetTransactionByBlockHashAndIndexOnChain(ctx context.Context, chainAddressOrName string, blockHash string, index int) (resp.TransactionResult, error) {
 	var txResult resp.TransactionResult
-	if err := rpc.callObject(&txResult, "getTransactionByBlockHashAndIndex", chainAddressOrName, blockHash, index); err != nil {
+	if err := rpc.callObject(ctx, &txResult, "getTransactionByBlockHashAndIndex", chainAddressOrName, blockHash, index); err != nil {
 		return resp.TransactionResult{}, err
 	}
 	return txResult, nil
 }
 
 // GetContract returns a contract by name on a chain.
-func (rpc PhantasmaRPC) GetContract(name, chainName string) (resp.ContractResult, error) {
+func (rpc PhantasmaRPC) GetContract(ctx context.Context, name, chainName string) (resp.ContractResult, error) {
 	var contract resp.ContractResult
-	result, err := rpc.client.Call(context.Background(), "getContract", chainName, name)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getContract", chainName, name)
 
 	if err := checkError(result, err); err != nil {
 		return resp.ContractResult{}, err
@@ -375,99 +379,99 @@ func (rpc PhantasmaRPC) GetContract(name, chainName string) (resp.ContractResult
 }
 
 // GetChains returns available chains.
-func (rpc PhantasmaRPC) GetChains(extended bool) ([]resp.ChainResult, error) {
+func (rpc PhantasmaRPC) GetChains(ctx context.Context, extended bool) ([]resp.ChainResult, error) {
 	var chains []resp.ChainResult
-	if err := rpc.callObject(&chains, "getChains", extended); err != nil {
+	if err := rpc.callObject(ctx, &chains, "getChains", extended); err != nil {
 		return []resp.ChainResult{}, err
 	}
 	return chains, nil
 }
 
 // GetChain returns a chain by name.
-func (rpc PhantasmaRPC) GetChain(name string, extended bool) (resp.ChainResult, error) {
+func (rpc PhantasmaRPC) GetChain(ctx context.Context, name string, extended bool) (resp.ChainResult, error) {
 	var chain resp.ChainResult
-	if err := rpc.callObject(&chain, "getChain", name, extended); err != nil {
+	if err := rpc.callObject(ctx, &chain, "getChain", name, extended); err != nil {
 		return resp.ChainResult{}, err
 	}
 	return chain, nil
 }
 
 // GetNexus returns nexus metadata.
-func (rpc PhantasmaRPC) GetNexus(extended bool) (resp.NexusResult, error) {
+func (rpc PhantasmaRPC) GetNexus(ctx context.Context, extended bool) (resp.NexusResult, error) {
 	var nexus resp.NexusResult
-	if err := rpc.callObject(&nexus, "getNexus", extended); err != nil {
+	if err := rpc.callObject(ctx, &nexus, "getNexus", extended); err != nil {
 		return resp.NexusResult{}, err
 	}
 	return nexus, nil
 }
 
 // GetContracts returns contracts deployed on a chain.
-func (rpc PhantasmaRPC) GetContracts(chainAddressOrName string, extended bool) ([]resp.ContractResult, error) {
+func (rpc PhantasmaRPC) GetContracts(ctx context.Context, chainAddressOrName string, extended bool) ([]resp.ContractResult, error) {
 	var contracts []resp.ContractResult
-	if err := rpc.callObject(&contracts, "getContracts", chainAddressOrName, extended); err != nil {
+	if err := rpc.callObject(ctx, &contracts, "getContracts", chainAddressOrName, extended); err != nil {
 		return []resp.ContractResult{}, err
 	}
 	return contracts, nil
 }
 
 // GetContractByName matches the RPC parameter order: chain, then contract name.
-func (rpc PhantasmaRPC) GetContractByName(chainAddressOrName string, contractName string) (resp.ContractResult, error) {
+func (rpc PhantasmaRPC) GetContractByName(ctx context.Context, chainAddressOrName string, contractName string) (resp.ContractResult, error) {
 	var contract resp.ContractResult
-	if err := rpc.callObject(&contract, "getContract", chainAddressOrName, contractName); err != nil {
+	if err := rpc.callObject(ctx, &contract, "getContract", chainAddressOrName, contractName); err != nil {
 		return resp.ContractResult{}, err
 	}
 	return contract, nil
 }
 
 // GetContractByAddress returns a contract by its address.
-func (rpc PhantasmaRPC) GetContractByAddress(chainAddressOrName string, contractAddress string) (resp.ContractResult, error) {
+func (rpc PhantasmaRPC) GetContractByAddress(ctx context.Context, chainAddressOrName string, contractAddress string) (resp.ContractResult, error) {
 	var contract resp.ContractResult
-	if err := rpc.callObject(&contract, "getContractByAddress", chainAddressOrName, contractAddress); err != nil {
+	if err := rpc.callObject(ctx, &contract, "getContractByAddress", chainAddressOrName, contractAddress); err != nil {
 		return resp.ContractResult{}, err
 	}
 	return contract, nil
 }
 
 // GetOrganization returns organization metadata by id.
-func (rpc PhantasmaRPC) GetOrganization(id string, extended bool) (resp.OrganizationResult, error) {
+func (rpc PhantasmaRPC) GetOrganization(ctx context.Context, id string, extended bool) (resp.OrganizationResult, error) {
 	var organization resp.OrganizationResult
-	if err := rpc.callObject(&organization, "getOrganization", id, extended); err != nil {
+	if err := rpc.callObject(ctx, &organization, "getOrganization", id, extended); err != nil {
 		return resp.OrganizationResult{}, err
 	}
 	return organization, nil
 }
 
 // GetOrganizationByName returns organization metadata by registered name.
-func (rpc PhantasmaRPC) GetOrganizationByName(name string, extended bool) (resp.OrganizationResult, error) {
+func (rpc PhantasmaRPC) GetOrganizationByName(ctx context.Context, name string, extended bool) (resp.OrganizationResult, error) {
 	var organization resp.OrganizationResult
-	if err := rpc.callObject(&organization, "getOrganizationByName", name, extended); err != nil {
+	if err := rpc.callObject(ctx, &organization, "getOrganizationByName", name, extended); err != nil {
 		return resp.OrganizationResult{}, err
 	}
 	return organization, nil
 }
 
 // GetOrganizations returns all organizations.
-func (rpc PhantasmaRPC) GetOrganizations(extended bool) ([]resp.OrganizationResult, error) {
+func (rpc PhantasmaRPC) GetOrganizations(ctx context.Context, extended bool) ([]resp.OrganizationResult, error) {
 	var organizations []resp.OrganizationResult
-	if err := rpc.callObject(&organizations, "getOrganizations", extended); err != nil {
+	if err := rpc.callObject(ctx, &organizations, "getOrganizations", extended); err != nil {
 		return []resp.OrganizationResult{}, err
 	}
 	return organizations, nil
 }
 
 // GetLeaderboard returns leaderboard rows by name.
-func (rpc PhantasmaRPC) GetLeaderboard(name string) (resp.LeaderboardResult, error) {
+func (rpc PhantasmaRPC) GetLeaderboard(ctx context.Context, name string) (resp.LeaderboardResult, error) {
 	var leaderboard resp.LeaderboardResult
-	if err := rpc.callObject(&leaderboard, "getLeaderboard", name); err != nil {
+	if err := rpc.callObject(ctx, &leaderboard, "getLeaderboard", name); err != nil {
 		return resp.LeaderboardResult{}, err
 	}
 	return leaderboard, nil
 }
 
 // InvokeRawScript executes a hex-encoded VM script against a chain without broadcasting it.
-func (rpc PhantasmaRPC) InvokeRawScript(chain, script string) (resp.ScriptResult, error) {
+func (rpc PhantasmaRPC) InvokeRawScript(ctx context.Context, chain, script string) (resp.ScriptResult, error) {
 	scriptResult := resp.ScriptResult{}
-	result, err := rpc.client.Call(context.Background(), "invokeRawScript", chain, script)
+	result, err := rpc.client.Call(normalizeContext(ctx), "invokeRawScript", chain, script)
 
 	if err := checkError(result, err); err != nil {
 		return resp.ScriptResult{}, err
@@ -488,9 +492,9 @@ func (rpc PhantasmaRPC) InvokeRawScript(chain, script string) (resp.ScriptResult
 }
 
 // SendRawTransaction broadcasts a hex-encoded classic VM transaction.
-func (rpc PhantasmaRPC) SendRawTransaction(txData string) (string, error) {
+func (rpc PhantasmaRPC) SendRawTransaction(ctx context.Context, txData string) (string, error) {
 	var hash string
-	result, err := rpc.client.Call(context.Background(), "sendRawTransaction", txData)
+	result, err := rpc.client.Call(normalizeContext(ctx), "sendRawTransaction", txData)
 
 	if err := checkError(result, err); err != nil {
 		return "", err
@@ -511,48 +515,50 @@ func (rpc PhantasmaRPC) SendRawTransaction(txData string) (string, error) {
 }
 
 // SendCarbonTransaction broadcasts a serialized Carbon transaction.
-func (rpc PhantasmaRPC) SendCarbonTransaction(txData string) (string, error) {
-	return rpc.callString("sendCarbonTransaction", txData)
+func (rpc PhantasmaRPC) SendCarbonTransaction(ctx context.Context, txData string) (string, error) {
+	return rpc.callString(ctx, "sendCarbonTransaction", txData)
 }
 
 // SignAndSendCarbonTransaction signs, serializes and broadcasts a Carbon transaction.
-func (rpc PhantasmaRPC) SignAndSendCarbonTransaction(msg carbon.TxMsg, keys cryptography.KeyPair) (string, error) {
+func (rpc PhantasmaRPC) SignAndSendCarbonTransaction(ctx context.Context, msg carbon.TxMsg, keys cryptography.KeyPair) (string, error) {
 	signedTx, err := carbon.SignAndSerializeTxMsg(msg, keys)
 	if err != nil {
 		return "", err
 	}
-	return rpc.SendCarbonTransaction(hex.EncodeToString(signedTx))
+	return rpc.SendCarbonTransaction(ctx, hex.EncodeToString(signedTx))
 }
 
 // SignAndSendTransaction builds, signs and broadcasts a classic VM transaction with a binary payload.
-func (rpc PhantasmaRPC) SignAndSendTransaction(keys cryptography.KeyPair, nexus string, script []byte, chainName string, payload []byte) (string, error) {
-	return rpc.SignAndSendTransactionWithExpiration(keys, nexus, script, chainName, payload, uint32(time.Now().UTC().Add(20*time.Minute).Unix()))
+func (rpc PhantasmaRPC) SignAndSendTransaction(ctx context.Context, keys cryptography.KeyPair, nexus string, script []byte, chainName string, payload []byte) (string, error) {
+	return rpc.SignAndSendTransactionWithExpiration(ctx, keys, nexus, script, chainName, payload, uint32(time.Now().UTC().Add(20*time.Minute).Unix()))
 }
 
 // SignAndSendTransactionWithExpiration builds, signs and broadcasts a classic VM transaction with an explicit expiration.
-func (rpc PhantasmaRPC) SignAndSendTransactionWithExpiration(keys cryptography.KeyPair, nexus string, script []byte, chainName string, payload []byte, expiration uint32) (string, error) {
+func (rpc PhantasmaRPC) SignAndSendTransactionWithExpiration(ctx context.Context, keys cryptography.KeyPair, nexus string, script []byte, chainName string, payload []byte, expiration uint32) (string, error) {
 	tx := chain.NewTransaction(nexus, chainName, script, expiration, payload)
-	return rpc.SignAndSendBuiltTransaction(tx, keys)
+	return rpc.SignAndSendBuiltTransaction(ctx, tx, keys)
 }
 
 // SignAndSendTransactionTextPayload builds, signs and broadcasts a classic VM transaction with a UTF-8 payload.
-func (rpc PhantasmaRPC) SignAndSendTransactionTextPayload(keys cryptography.KeyPair, nexus string, script []byte, chainName string, payload string) (string, error) {
-	return rpc.SignAndSendTransaction(keys, nexus, script, chainName, []byte(payload))
+func (rpc PhantasmaRPC) SignAndSendTransactionTextPayload(ctx context.Context, keys cryptography.KeyPair, nexus string, script []byte, chainName string, payload string) (string, error) {
+	return rpc.SignAndSendTransaction(ctx, keys, nexus, script, chainName, []byte(payload))
 }
 
 // SignAndSendBuiltTransaction signs and broadcasts an already-built classic VM transaction.
-func (rpc PhantasmaRPC) SignAndSendBuiltTransaction(tx chain.Transaction, keys cryptography.KeyPair) (string, error) {
+func (rpc PhantasmaRPC) SignAndSendBuiltTransaction(ctx context.Context, tx chain.Transaction, keys cryptography.KeyPair) (string, error) {
 	if keys == nil {
 		return "", errors.New("key pair is required")
 	}
-	tx.Sign(keys)
-	return rpc.SendRawTransaction(hex.EncodeToString(tx.Bytes()))
+	if err := tx.Sign(keys); err != nil {
+		return "", err
+	}
+	return rpc.SendRawTransaction(ctx, hex.EncodeToString(tx.Bytes()))
 }
 
 // GetTransaction returns transaction details by hash.
-func (rpc PhantasmaRPC) GetTransaction(txHash string) (resp.TransactionResult, error) {
+func (rpc PhantasmaRPC) GetTransaction(ctx context.Context, txHash string) (resp.TransactionResult, error) {
 	var txResult resp.TransactionResult
-	result, err := rpc.client.Call(context.Background(), "getTransaction", txHash)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getTransaction", txHash)
 
 	if err := checkError(result, err); err != nil {
 		return resp.TransactionResult{}, err
@@ -572,9 +578,9 @@ func (rpc PhantasmaRPC) GetTransaction(txHash string) (resp.TransactionResult, e
 }
 
 // GetTokens returns token definitions known by the connected node.
-func (rpc PhantasmaRPC) GetTokens(extended bool) ([]resp.TokenResult, error) {
+func (rpc PhantasmaRPC) GetTokens(ctx context.Context, extended bool) ([]resp.TokenResult, error) {
 	var txResult []resp.TokenResult
-	result, err := rpc.client.Call(context.Background(), "getTokens", extended)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getTokens", extended)
 
 	if err := checkError(result, err); err != nil {
 		return []resp.TokenResult{}, err
@@ -594,26 +600,26 @@ func (rpc PhantasmaRPC) GetTokens(extended bool) ([]resp.TokenResult, error) {
 }
 
 // GetTokensByOwner returns tokens filtered by owner address.
-func (rpc PhantasmaRPC) GetTokensByOwner(extended bool, ownerAddress string) ([]resp.TokenResult, error) {
+func (rpc PhantasmaRPC) GetTokensByOwner(ctx context.Context, extended bool, ownerAddress string) ([]resp.TokenResult, error) {
 	var tokens []resp.TokenResult
-	if err := rpc.callObject(&tokens, "getTokens", extended, ownerAddress); err != nil {
+	if err := rpc.callObject(ctx, &tokens, "getTokens", extended, ownerAddress); err != nil {
 		return []resp.TokenResult{}, err
 	}
 	return tokens, nil
 }
 
 // GetTokensByOwnerWithAddressType returns tokens filtered by owner address and address type.
-func (rpc PhantasmaRPC) GetTokensByOwnerWithAddressType(extended bool, ownerAddress string, addressType AddressType) ([]resp.TokenResult, error) {
+func (rpc PhantasmaRPC) GetTokensByOwnerWithAddressType(ctx context.Context, extended bool, ownerAddress string, addressType AddressType) ([]resp.TokenResult, error) {
 	var tokens []resp.TokenResult
-	if err := rpc.callObject(&tokens, "getTokens", extended, ownerAddress, addressType); err != nil {
+	if err := rpc.callObject(ctx, &tokens, "getTokens", extended, ownerAddress, addressType); err != nil {
 		return []resp.TokenResult{}, err
 	}
 	return tokens, nil
 }
 
 // GetTokensAsMap returns chain tokens map where token symbol is used as a key
-func (rpc PhantasmaRPC) GetTokensAsMap(extended bool) (map[string]resp.TokenResult, error) {
-	result, err := rpc.GetTokens(extended)
+func (rpc PhantasmaRPC) GetTokensAsMap(ctx context.Context, extended bool) (map[string]resp.TokenResult, error) {
+	result, err := rpc.GetTokens(ctx, extended)
 	if err != nil {
 		return nil, err
 	}
@@ -628,9 +634,9 @@ func (rpc PhantasmaRPC) GetTokensAsMap(extended bool) (map[string]resp.TokenResu
 }
 
 // GetToken returns a token by symbol.
-func (rpc PhantasmaRPC) GetToken(symbol string, extended bool) (resp.TokenResult, error) {
+func (rpc PhantasmaRPC) GetToken(ctx context.Context, symbol string, extended bool) (resp.TokenResult, error) {
 	var txResult resp.TokenResult
-	result, err := rpc.client.Call(context.Background(), "getToken", symbol, extended)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getToken", symbol, extended)
 
 	if err := checkError(result, err); err != nil {
 		return resp.TokenResult{}, err
@@ -650,228 +656,228 @@ func (rpc PhantasmaRPC) GetToken(symbol string, extended bool) (resp.TokenResult
 }
 
 // GetTokenWithID returns a token by symbol and optional Carbon token id. Use 0 when no Carbon id filter is needed.
-func (rpc PhantasmaRPC) GetTokenWithID(symbol string, extended bool, carbonTokenID uint64) (resp.TokenResult, error) {
+func (rpc PhantasmaRPC) GetTokenWithID(ctx context.Context, symbol string, extended bool, carbonTokenID uint64) (resp.TokenResult, error) {
 	var token resp.TokenResult
-	if err := rpc.callObject(&token, "getToken", symbol, extended, carbonTokenID); err != nil {
+	if err := rpc.callObject(ctx, &token, "getToken", symbol, extended, carbonTokenID); err != nil {
 		return resp.TokenResult{}, err
 	}
 	return token, nil
 }
 
 // GetTokenData returns token data for a Phantasma NFT id.
-func (rpc PhantasmaRPC) GetTokenData(symbol string, tokenID string) (resp.TokenDataResult, error) {
+func (rpc PhantasmaRPC) GetTokenData(ctx context.Context, symbol string, tokenID string) (resp.TokenDataResult, error) {
 	var tokenData resp.TokenDataResult
-	if err := rpc.callObject(&tokenData, "getTokenData", symbol, tokenID); err != nil {
+	if err := rpc.callObject(ctx, &tokenData, "getTokenData", symbol, tokenID); err != nil {
 		return resp.TokenDataResult{}, err
 	}
 	return tokenData, nil
 }
 
 // GetTokenBalance returns a token balance for an account.
-func (rpc PhantasmaRPC) GetTokenBalance(address string, tokenSymbol string, chainAddressOrName string) (resp.BalanceResult, error) {
+func (rpc PhantasmaRPC) GetTokenBalance(ctx context.Context, address string, tokenSymbol string, chainAddressOrName string) (resp.BalanceResult, error) {
 	var balance resp.BalanceResult
-	if err := rpc.callObject(&balance, "getTokenBalance", address, tokenSymbol, chainAddressOrName); err != nil {
+	if err := rpc.callObject(ctx, &balance, "getTokenBalance", address, tokenSymbol, chainAddressOrName); err != nil {
 		return resp.BalanceResult{}, err
 	}
 	return balance, nil
 }
 
 // GetTokenBalanceChecked returns a token balance and requests address reserved-byte validation.
-func (rpc PhantasmaRPC) GetTokenBalanceChecked(address string, tokenSymbol string, chainAddressOrName string, checkAddressReservedByte bool) (resp.BalanceResult, error) {
+func (rpc PhantasmaRPC) GetTokenBalanceChecked(ctx context.Context, address string, tokenSymbol string, chainAddressOrName string, checkAddressReservedByte bool) (resp.BalanceResult, error) {
 	var balance resp.BalanceResult
-	if err := rpc.callObject(&balance, "getTokenBalance", address, tokenSymbol, chainAddressOrName, checkAddressReservedByte); err != nil {
+	if err := rpc.callObject(ctx, &balance, "getTokenBalance", address, tokenSymbol, chainAddressOrName, checkAddressReservedByte); err != nil {
 		return resp.BalanceResult{}, err
 	}
 	return balance, nil
 }
 
 // GetTokenBalanceWithAddressType returns a token balance with explicit address interpretation.
-func (rpc PhantasmaRPC) GetTokenBalanceWithAddressType(address string, tokenSymbol string, chainAddressOrName string, checkAddressReservedByte bool, addressType AddressType) (resp.BalanceResult, error) {
+func (rpc PhantasmaRPC) GetTokenBalanceWithAddressType(ctx context.Context, address string, tokenSymbol string, chainAddressOrName string, checkAddressReservedByte bool, addressType AddressType) (resp.BalanceResult, error) {
 	var balance resp.BalanceResult
-	if err := rpc.callObject(&balance, "getTokenBalance", address, tokenSymbol, chainAddressOrName, checkAddressReservedByte, addressType); err != nil {
+	if err := rpc.callObject(ctx, &balance, "getTokenBalance", address, tokenSymbol, chainAddressOrName, checkAddressReservedByte, addressType); err != nil {
 		return resp.BalanceResult{}, err
 	}
 	return balance, nil
 }
 
 // GetTokenSeries returns token series with cursor pagination. Use carbonTokenID 0 when no Carbon token id filter is needed.
-func (rpc PhantasmaRPC) GetTokenSeries(symbol string, carbonTokenID uint64, pageSize int, cursor string) (resp.CursorPaginatedResult[[]resp.TokenSeriesResult], error) {
+func (rpc PhantasmaRPC) GetTokenSeries(ctx context.Context, symbol string, carbonTokenID uint64, pageSize int, cursor string) (resp.CursorPaginatedResult[[]resp.TokenSeriesResult], error) {
 	var series resp.CursorPaginatedResult[[]resp.TokenSeriesResult]
-	if err := rpc.callObject(&series, "getTokenSeries", symbol, carbonTokenID, pageSize, cursor); err != nil {
+	if err := rpc.callObject(ctx, &series, "getTokenSeries", symbol, carbonTokenID, pageSize, cursor); err != nil {
 		return resp.CursorPaginatedResult[[]resp.TokenSeriesResult]{}, err
 	}
 	return series, nil
 }
 
 // GetTokenSeriesByID returns a single token series by Phantasma or Carbon series id.
-func (rpc PhantasmaRPC) GetTokenSeriesByID(symbol string, carbonTokenID uint64, seriesID string, carbonSeriesID uint32) (resp.TokenSeriesResult, error) {
+func (rpc PhantasmaRPC) GetTokenSeriesByID(ctx context.Context, symbol string, carbonTokenID uint64, seriesID string, carbonSeriesID uint32) (resp.TokenSeriesResult, error) {
 	var series resp.TokenSeriesResult
-	if err := rpc.callObject(&series, "getTokenSeriesById", symbol, carbonTokenID, seriesID, carbonSeriesID); err != nil {
+	if err := rpc.callObject(ctx, &series, "getTokenSeriesById", symbol, carbonTokenID, seriesID, carbonSeriesID); err != nil {
 		return resp.TokenSeriesResult{}, err
 	}
 	return series, nil
 }
 
 // GetTokenNFTs returns NFTs for a Carbon token with cursor pagination.
-func (rpc PhantasmaRPC) GetTokenNFTs(carbonTokenID uint64, carbonSeriesID uint32, pageSize int, cursor string, extended bool) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
-	return rpc.GetTokenNFTsWithSeriesID(carbonTokenID, carbonSeriesID, "", pageSize, cursor, extended)
+func (rpc PhantasmaRPC) GetTokenNFTs(ctx context.Context, carbonTokenID uint64, carbonSeriesID uint32, pageSize int, cursor string, extended bool) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
+	return rpc.GetTokenNFTsWithSeriesID(ctx, carbonTokenID, carbonSeriesID, "", pageSize, cursor, extended)
 }
 
 // GetTokenNFTsWithSeriesID returns NFTs and can filter by either Carbon or Phantasma series id.
-func (rpc PhantasmaRPC) GetTokenNFTsWithSeriesID(carbonTokenID uint64, carbonSeriesID uint32, seriesID string, pageSize int, cursor string, extended bool) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
+func (rpc PhantasmaRPC) GetTokenNFTsWithSeriesID(ctx context.Context, carbonTokenID uint64, carbonSeriesID uint32, seriesID string, pageSize int, cursor string, extended bool) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
 	var nfts resp.CursorPaginatedResult[[]resp.TokenDataResult]
-	if err := rpc.callObject(&nfts, "getTokenNFTs", carbonTokenID, carbonSeriesID, pageSize, cursor, extended, seriesID); err != nil {
+	if err := rpc.callObject(ctx, &nfts, "getTokenNFTs", carbonTokenID, carbonSeriesID, pageSize, cursor, extended, seriesID); err != nil {
 		return resp.CursorPaginatedResult[[]resp.TokenDataResult]{}, err
 	}
 	return nfts, nil
 }
 
 // GetAccountFungibleTokens returns fungible balances owned by an account with cursor pagination.
-func (rpc PhantasmaRPC) GetAccountFungibleTokens(account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.BalanceResult], error) {
+func (rpc PhantasmaRPC) GetAccountFungibleTokens(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.BalanceResult], error) {
 	var balances resp.CursorPaginatedResult[[]resp.BalanceResult]
-	if err := rpc.callObject(&balances, "getAccountFungibleTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte); err != nil {
+	if err := rpc.callObject(ctx, &balances, "getAccountFungibleTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte); err != nil {
 		return resp.CursorPaginatedResult[[]resp.BalanceResult]{}, err
 	}
 	return balances, nil
 }
 
 // GetAccountFungibleTokensWithAddressType returns fungible balances with explicit address interpretation.
-func (rpc PhantasmaRPC) GetAccountFungibleTokensWithAddressType(account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool, addressType AddressType) (resp.CursorPaginatedResult[[]resp.BalanceResult], error) {
+func (rpc PhantasmaRPC) GetAccountFungibleTokensWithAddressType(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool, addressType AddressType) (resp.CursorPaginatedResult[[]resp.BalanceResult], error) {
 	var balances resp.CursorPaginatedResult[[]resp.BalanceResult]
-	if err := rpc.callObject(&balances, "getAccountFungibleTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte, addressType); err != nil {
+	if err := rpc.callObject(ctx, &balances, "getAccountFungibleTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte, addressType); err != nil {
 		return resp.CursorPaginatedResult[[]resp.BalanceResult]{}, err
 	}
 	return balances, nil
 }
 
 // GetAccountNFTs returns NFTs owned by an account with cursor pagination.
-func (rpc PhantasmaRPC) GetAccountNFTs(account string, tokenSymbol string, carbonTokenID uint64, carbonSeriesID uint32, pageSize int, cursor string, extended bool, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
+func (rpc PhantasmaRPC) GetAccountNFTs(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, carbonSeriesID uint32, pageSize int, cursor string, extended bool, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
 	var nfts resp.CursorPaginatedResult[[]resp.TokenDataResult]
-	if err := rpc.callObject(&nfts, "getAccountNFTs", account, tokenSymbol, carbonTokenID, carbonSeriesID, pageSize, cursor, extended, checkAddressReservedByte); err != nil {
+	if err := rpc.callObject(ctx, &nfts, "getAccountNFTs", account, tokenSymbol, carbonTokenID, carbonSeriesID, pageSize, cursor, extended, checkAddressReservedByte); err != nil {
 		return resp.CursorPaginatedResult[[]resp.TokenDataResult]{}, err
 	}
 	return nfts, nil
 }
 
 // GetAccountNFTsWithAddressType returns NFTs with explicit address interpretation.
-func (rpc PhantasmaRPC) GetAccountNFTsWithAddressType(account string, tokenSymbol string, carbonTokenID uint64, carbonSeriesID uint32, pageSize int, cursor string, extended bool, checkAddressReservedByte bool, addressType AddressType) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
+func (rpc PhantasmaRPC) GetAccountNFTsWithAddressType(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, carbonSeriesID uint32, pageSize int, cursor string, extended bool, checkAddressReservedByte bool, addressType AddressType) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
 	var nfts resp.CursorPaginatedResult[[]resp.TokenDataResult]
-	if err := rpc.callObject(&nfts, "getAccountNFTs", account, tokenSymbol, carbonTokenID, carbonSeriesID, pageSize, cursor, extended, checkAddressReservedByte, addressType); err != nil {
+	if err := rpc.callObject(ctx, &nfts, "getAccountNFTs", account, tokenSymbol, carbonTokenID, carbonSeriesID, pageSize, cursor, extended, checkAddressReservedByte, addressType); err != nil {
 		return resp.CursorPaginatedResult[[]resp.TokenDataResult]{}, err
 	}
 	return nfts, nil
 }
 
 // GetAccountOwnedTokens returns token definitions owned by an account with cursor pagination.
-func (rpc PhantasmaRPC) GetAccountOwnedTokens(account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.TokenResult], error) {
+func (rpc PhantasmaRPC) GetAccountOwnedTokens(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.TokenResult], error) {
 	var tokens resp.CursorPaginatedResult[[]resp.TokenResult]
-	if err := rpc.callObject(&tokens, "getAccountOwnedTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte); err != nil {
+	if err := rpc.callObject(ctx, &tokens, "getAccountOwnedTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte); err != nil {
 		return resp.CursorPaginatedResult[[]resp.TokenResult]{}, err
 	}
 	return tokens, nil
 }
 
 // GetAccountOwnedTokensWithAddressType returns owned token definitions with explicit address interpretation.
-func (rpc PhantasmaRPC) GetAccountOwnedTokensWithAddressType(account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool, addressType AddressType) (resp.CursorPaginatedResult[[]resp.TokenResult], error) {
+func (rpc PhantasmaRPC) GetAccountOwnedTokensWithAddressType(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool, addressType AddressType) (resp.CursorPaginatedResult[[]resp.TokenResult], error) {
 	var tokens resp.CursorPaginatedResult[[]resp.TokenResult]
-	if err := rpc.callObject(&tokens, "getAccountOwnedTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte, addressType); err != nil {
+	if err := rpc.callObject(ctx, &tokens, "getAccountOwnedTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte, addressType); err != nil {
 		return resp.CursorPaginatedResult[[]resp.TokenResult]{}, err
 	}
 	return tokens, nil
 }
 
 // GetAccountOwnedTokenSeries returns token series owned by an account with cursor pagination.
-func (rpc PhantasmaRPC) GetAccountOwnedTokenSeries(account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.TokenSeriesResult], error) {
+func (rpc PhantasmaRPC) GetAccountOwnedTokenSeries(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.TokenSeriesResult], error) {
 	var series resp.CursorPaginatedResult[[]resp.TokenSeriesResult]
-	if err := rpc.callObject(&series, "getAccountOwnedTokenSeries", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte); err != nil {
+	if err := rpc.callObject(ctx, &series, "getAccountOwnedTokenSeries", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte); err != nil {
 		return resp.CursorPaginatedResult[[]resp.TokenSeriesResult]{}, err
 	}
 	return series, nil
 }
 
 // GetAccountOwnedTokenSeriesWithAddressType returns owned token series with explicit address interpretation.
-func (rpc PhantasmaRPC) GetAccountOwnedTokenSeriesWithAddressType(account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool, addressType AddressType) (resp.CursorPaginatedResult[[]resp.TokenSeriesResult], error) {
+func (rpc PhantasmaRPC) GetAccountOwnedTokenSeriesWithAddressType(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool, addressType AddressType) (resp.CursorPaginatedResult[[]resp.TokenSeriesResult], error) {
 	var series resp.CursorPaginatedResult[[]resp.TokenSeriesResult]
-	if err := rpc.callObject(&series, "getAccountOwnedTokenSeries", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte, addressType); err != nil {
+	if err := rpc.callObject(ctx, &series, "getAccountOwnedTokenSeries", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte, addressType); err != nil {
 		return resp.CursorPaginatedResult[[]resp.TokenSeriesResult]{}, err
 	}
 	return series, nil
 }
 
 // GetAuctionsCount returns auction count for a token on a chain.
-func (rpc PhantasmaRPC) GetAuctionsCount(chainAddressOrName string, symbol string) (int, error) {
-	return rpc.callInt("getAuctionsCount", chainAddressOrName, symbol)
+func (rpc PhantasmaRPC) GetAuctionsCount(ctx context.Context, chainAddressOrName string, symbol string) (int, error) {
+	return rpc.callInt(ctx, "getAuctionsCount", chainAddressOrName, symbol)
 }
 
 // GetAuctions returns auctions with page pagination.
-func (rpc PhantasmaRPC) GetAuctions(chainAddressOrName string, symbol string, page int, pageSize int) (resp.PaginatedResult[[]resp.AuctionResult], error) {
+func (rpc PhantasmaRPC) GetAuctions(ctx context.Context, chainAddressOrName string, symbol string, page int, pageSize int) (resp.PaginatedResult[[]resp.AuctionResult], error) {
 	var auctions resp.PaginatedResult[[]resp.AuctionResult]
-	if err := rpc.callObject(&auctions, "getAuctions", chainAddressOrName, symbol, page, pageSize); err != nil {
+	if err := rpc.callObject(ctx, &auctions, "getAuctions", chainAddressOrName, symbol, page, pageSize); err != nil {
 		return resp.PaginatedResult[[]resp.AuctionResult]{}, err
 	}
 	return auctions, nil
 }
 
 // GetAuction returns a single auction by token id.
-func (rpc PhantasmaRPC) GetAuction(chainAddressOrName string, symbol string, tokenID string) (resp.AuctionResult, error) {
+func (rpc PhantasmaRPC) GetAuction(ctx context.Context, chainAddressOrName string, symbol string, tokenID string) (resp.AuctionResult, error) {
 	var auction resp.AuctionResult
-	if err := rpc.callObject(&auction, "getAuction", chainAddressOrName, symbol, tokenID); err != nil {
+	if err := rpc.callObject(ctx, &auction, "getAuction", chainAddressOrName, symbol, tokenID); err != nil {
 		return resp.AuctionResult{}, err
 	}
 	return auction, nil
 }
 
 // GetNFT returns NFT data and optionally loads properties.
-func (rpc PhantasmaRPC) GetNFT(symbol string, tokenID string, extended bool) (resp.TokenDataResult, error) {
+func (rpc PhantasmaRPC) GetNFT(ctx context.Context, symbol string, tokenID string, extended bool) (resp.TokenDataResult, error) {
 	var nft resp.TokenDataResult
-	if err := rpc.callObject(&nft, "getNFT", symbol, tokenID, extended); err != nil {
+	if err := rpc.callObject(ctx, &nft, "getNFT", symbol, tokenID, extended); err != nil {
 		return resp.TokenDataResult{}, err
 	}
 	return nft, nil
 }
 
 // GetNFTs returns NFT data for a list of token ids.
-func (rpc PhantasmaRPC) GetNFTs(symbol string, tokenIDs []string, extended bool) ([]resp.TokenDataResult, error) {
-	return rpc.GetNFTsText(symbol, strings.Join(tokenIDs, ","), extended)
+func (rpc PhantasmaRPC) GetNFTs(ctx context.Context, symbol string, tokenIDs []string, extended bool) ([]resp.TokenDataResult, error) {
+	return rpc.GetNFTsText(ctx, symbol, strings.Join(tokenIDs, ","), extended)
 }
 
 // GetNFTsText returns NFT data for a comma-separated token id list.
-func (rpc PhantasmaRPC) GetNFTsText(symbol string, tokenIDs string, extended bool) ([]resp.TokenDataResult, error) {
+func (rpc PhantasmaRPC) GetNFTsText(ctx context.Context, symbol string, tokenIDs string, extended bool) ([]resp.TokenDataResult, error) {
 	var nfts []resp.TokenDataResult
-	if err := rpc.callObject(&nfts, "getNFTs", symbol, tokenIDs, extended); err != nil {
+	if err := rpc.callObject(ctx, &nfts, "getNFTs", symbol, tokenIDs, extended); err != nil {
 		return []resp.TokenDataResult{}, err
 	}
 	return nfts, nil
 }
 
 // GetArchive returns archive metadata by hash.
-func (rpc PhantasmaRPC) GetArchive(hash string) (resp.ArchiveResult, error) {
+func (rpc PhantasmaRPC) GetArchive(ctx context.Context, hash string) (resp.ArchiveResult, error) {
 	var archive resp.ArchiveResult
-	if err := rpc.callObject(&archive, "getArchive", hash); err != nil {
+	if err := rpc.callObject(ctx, &archive, "getArchive", hash); err != nil {
 		return resp.ArchiveResult{}, err
 	}
 	return archive, nil
 }
 
 // WriteArchive writes an archive block.
-func (rpc PhantasmaRPC) WriteArchive(hash string, blockIndex int, blockContent []byte) (bool, error) {
-	return rpc.WriteArchiveBase64(hash, blockIndex, base64.StdEncoding.EncodeToString(blockContent))
+func (rpc PhantasmaRPC) WriteArchive(ctx context.Context, hash string, blockIndex int, blockContent []byte) (bool, error) {
+	return rpc.WriteArchiveBase64(ctx, hash, blockIndex, base64.StdEncoding.EncodeToString(blockContent))
 }
 
 // WriteArchiveBase64 writes a base64-encoded archive block.
-func (rpc PhantasmaRPC) WriteArchiveBase64(hash string, blockIndex int, blockContent string) (bool, error) {
-	return rpc.callBool("writeArchive", hash, blockIndex, blockContent)
+func (rpc PhantasmaRPC) WriteArchiveBase64(ctx context.Context, hash string, blockIndex int, blockContent string) (bool, error) {
+	return rpc.callBool(ctx, "writeArchive", hash, blockIndex, blockContent)
 }
 
 // ReadArchive reads a base64 encoded archive block.
-func (rpc PhantasmaRPC) ReadArchive(hash string, blockIndex int) (string, error) {
-	return rpc.callString("readArchive", hash, blockIndex)
+func (rpc PhantasmaRPC) ReadArchive(ctx context.Context, hash string, blockIndex int) (string, error) {
+	return rpc.callString(ctx, "readArchive", hash, blockIndex)
 }
 
 // GetVersion returns node build and version metadata.
-func (rpc PhantasmaRPC) GetVersion() (resp.BuildInfoResult, error) {
+func (rpc PhantasmaRPC) GetVersion(ctx context.Context) (resp.BuildInfoResult, error) {
 	var buildInfo resp.BuildInfoResult
-	result, err := rpc.client.Call(context.Background(), "getVersion", []interface{}{})
+	result, err := rpc.client.Call(normalizeContext(ctx), "getVersion", []interface{}{})
 
 	if err := checkError(result, err); err != nil {
 		return resp.BuildInfoResult{}, err
@@ -886,9 +892,9 @@ func (rpc PhantasmaRPC) GetVersion() (resp.BuildInfoResult, error) {
 }
 
 // GetPhantasmaVMConfig returns active VM configuration for a chain.
-func (rpc PhantasmaRPC) GetPhantasmaVMConfig(chainAddressOrName string) (resp.PhantasmaVMConfigResult, error) {
+func (rpc PhantasmaRPC) GetPhantasmaVMConfig(ctx context.Context, chainAddressOrName string) (resp.PhantasmaVMConfigResult, error) {
 	var config resp.PhantasmaVMConfigResult
-	result, err := rpc.client.Call(context.Background(), "getPhantasmaVmConfig", chainAddressOrName)
+	result, err := rpc.client.Call(normalizeContext(ctx), "getPhantasmaVmConfig", chainAddressOrName)
 
 	if err := checkError(result, err); err != nil {
 		return resp.PhantasmaVMConfigResult{}, err

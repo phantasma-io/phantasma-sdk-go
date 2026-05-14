@@ -211,6 +211,12 @@ func (f FeeOptions) CalculateMaxGas() uint64 {
 	return f.GasFeeBase * f.FeeMultiplier
 }
 
+// CalculateMaxGasForCount calculates max gas for count-sensitive transactions.
+func (f FeeOptions) CalculateMaxGasForCount(count uint64) (uint64, error) {
+	f = f.withDefaults()
+	return multiplyGasForCount(f.GasFeeBase, f.FeeMultiplier, count, "FeeOptions.CalculateMaxGasForCount")
+}
+
 func (f FeeOptions) withDefaults() FeeOptions {
 	defaults := DefaultFeeOptions()
 	if f.GasFeeBase == 0 {
@@ -224,18 +230,25 @@ func (f FeeOptions) withDefaults() FeeOptions {
 
 // CreateTokenFeeOptions controls gas calculation for create-token transactions.
 type CreateTokenFeeOptions struct {
-	FeeOptions
+	GasFeeBase              uint64
+	FeeMultiplier           uint64
 	GasFeeCreateTokenBase   uint64
 	GasFeeCreateTokenSymbol uint64
 }
 
+// NewCreateTokenFeeOptions returns explicit create-token gas fee options.
+func NewCreateTokenFeeOptions(gasFeeBase, feeMultiplier, createTokenBase, createTokenSymbol uint64) CreateTokenFeeOptions {
+	return CreateTokenFeeOptions{
+		GasFeeBase:              gasFeeBase,
+		FeeMultiplier:           feeMultiplier,
+		GasFeeCreateTokenBase:   createTokenBase,
+		GasFeeCreateTokenSymbol: createTokenSymbol,
+	}
+}
+
 // DefaultCreateTokenFeeOptions returns SDK default create-token fee options.
 func DefaultCreateTokenFeeOptions() CreateTokenFeeOptions {
-	return CreateTokenFeeOptions{
-		FeeOptions:              NewFeeOptions(10_000, 10_000),
-		GasFeeCreateTokenBase:   10_000_000_000,
-		GasFeeCreateTokenSymbol: 10_000_000_000,
-	}
+	return NewCreateTokenFeeOptions(10_000, 10_000, 10_000_000_000, 10_000_000_000)
 }
 
 // CalculateMaxGas calculates create-token max gas using defaults for zero-valued fields.
@@ -273,16 +286,23 @@ func (f CreateTokenFeeOptions) withDefaults() CreateTokenFeeOptions {
 
 // CreateSeriesFeeOptions controls gas calculation for create-series transactions.
 type CreateSeriesFeeOptions struct {
-	FeeOptions
+	GasFeeBase             uint64
+	FeeMultiplier          uint64
 	GasFeeCreateSeriesBase uint64
+}
+
+// NewCreateSeriesFeeOptions returns explicit create-series gas fee options.
+func NewCreateSeriesFeeOptions(gasFeeBase, feeMultiplier, createSeriesBase uint64) CreateSeriesFeeOptions {
+	return CreateSeriesFeeOptions{
+		GasFeeBase:             gasFeeBase,
+		FeeMultiplier:          feeMultiplier,
+		GasFeeCreateSeriesBase: createSeriesBase,
+	}
 }
 
 // DefaultCreateSeriesFeeOptions returns SDK default create-series fee options.
 func DefaultCreateSeriesFeeOptions() CreateSeriesFeeOptions {
-	return CreateSeriesFeeOptions{
-		FeeOptions:             NewFeeOptions(10_000, 10_000),
-		GasFeeCreateSeriesBase: 2_500_000_000,
-	}
+	return NewCreateSeriesFeeOptions(10_000, 10_000, 2_500_000_000)
 }
 
 // CalculateMaxGas calculates create-series max gas using defaults for zero-valued fields.
@@ -307,12 +327,57 @@ func (f CreateSeriesFeeOptions) withDefaults() CreateSeriesFeeOptions {
 
 // MintNFTFeeOptions controls gas calculation for NFT mint transactions.
 type MintNFTFeeOptions struct {
-	FeeOptions
+	GasFeeBase    uint64
+	FeeMultiplier uint64
+}
+
+// NewMintNFTFeeOptions returns explicit NFT mint gas fee options.
+func NewMintNFTFeeOptions(gasFeeBase, feeMultiplier uint64) MintNFTFeeOptions {
+	return MintNFTFeeOptions{GasFeeBase: gasFeeBase, FeeMultiplier: feeMultiplier}
 }
 
 // DefaultMintNFTFeeOptions returns SDK default NFT mint fee options.
 func DefaultMintNFTFeeOptions() MintNFTFeeOptions {
-	return MintNFTFeeOptions{FeeOptions: DefaultFeeOptions()}
+	defaults := DefaultFeeOptions()
+	return NewMintNFTFeeOptions(defaults.GasFeeBase, defaults.FeeMultiplier)
+}
+
+// CalculateMaxGasForCount calculates NFT mint max gas for the requested token count.
+func (f MintNFTFeeOptions) CalculateMaxGasForCount(count uint64) (uint64, error) {
+	f = f.withDefaults()
+	return multiplyGasForCount(f.GasFeeBase, f.FeeMultiplier, count, "MintNFTFeeOptions.CalculateMaxGasForCount")
+}
+
+func (f MintNFTFeeOptions) calculateMaxGasForSingle() uint64 {
+	f = f.withDefaults()
+	return f.GasFeeBase * f.FeeMultiplier
+}
+
+func (f MintNFTFeeOptions) withDefaults() MintNFTFeeOptions {
+	defaults := DefaultMintNFTFeeOptions()
+	if f.GasFeeBase == 0 {
+		f.GasFeeBase = defaults.GasFeeBase
+	}
+	if f.FeeMultiplier == 0 {
+		f.FeeMultiplier = defaults.FeeMultiplier
+	}
+	return f
+}
+
+func multiplyGasForCount(gasFeeBase, feeMultiplier, count uint64, methodName string) (uint64, error) {
+	if count == 0 {
+		return 0, fmt.Errorf("%s count must be positive", methodName)
+	}
+
+	max := ^uint64(0)
+	if gasFeeBase != 0 && feeMultiplier > max/gasFeeBase {
+		return 0, fmt.Errorf("%s overflow", methodName)
+	}
+	baseGas := gasFeeBase * feeMultiplier
+	if baseGas != 0 && count > max/baseGas {
+		return 0, fmt.Errorf("%s overflow", methodName)
+	}
+	return baseGas * count, nil
 }
 
 // BuildCreateTokenTx builds an unsigned Carbon create-token transaction.
@@ -388,7 +453,7 @@ func BuildMintNonFungibleTx(tokenID uint64, seriesID uint32, sender Bytes32, rec
 	return TxMsg{
 		Type:    TxTypeMintNonFungible,
 		Expiry:  effectiveExpiry(expiry),
-		MaxGas:  fees.CalculateMaxGas(),
+		MaxGas:  fees.calculateMaxGasForSingle(),
 		MaxData: maxData,
 		GasFrom: sender,
 		Payload: MustSmallString(""),
@@ -418,7 +483,12 @@ func BuildMintNonFungibleTxAndSignHex(tokenID uint64, seriesID uint32, signer cr
 }
 
 // BuildMintPhantasmaNonFungibleTx builds an unsigned Phantasma NFT mint transaction.
-func BuildMintPhantasmaNonFungibleTx(tokenID uint64, sender Bytes32, receiver Bytes32, tokens []PhantasmaNFTMintInfo, fees MintNFTFeeOptions, maxData uint64, expiry int64) TxMsg {
+func BuildMintPhantasmaNonFungibleTx(tokenID uint64, sender Bytes32, receiver Bytes32, tokens []PhantasmaNFTMintInfo, fees MintNFTFeeOptions, maxData uint64, expiry int64) (TxMsg, error) {
+	maxGas, err := fees.CalculateMaxGasForCount(uint64(len(tokens)))
+	if err != nil {
+		return TxMsg{}, err
+	}
+
 	args := MintPhantasmaNonFungibleArgs{
 		TokenID: tokenID,
 		Address: receiver,
@@ -427,7 +497,7 @@ func BuildMintPhantasmaNonFungibleTx(tokenID uint64, sender Bytes32, receiver By
 	return TxMsg{
 		Type:    TxTypeCall,
 		Expiry:  effectiveExpiry(expiry),
-		MaxGas:  fees.CalculateMaxGas(),
+		MaxGas:  maxGas,
 		MaxData: maxData,
 		GasFrom: sender,
 		Payload: MustSmallString(""),
@@ -436,7 +506,7 @@ func BuildMintPhantasmaNonFungibleTx(tokenID uint64, sender Bytes32, receiver By
 			MethodID: uint32(TokenMethodMintPhantasmaNonFungible),
 			Args:     Serialize(&args),
 		},
-	}
+	}, nil
 }
 
 // BuildMintPhantasmaNonFungibleSingleTx builds an unsigned single-Phantasma-NFT mint transaction.
@@ -461,7 +531,7 @@ func BuildMintPhantasmaNonFungibleSingleTx(tokenID uint64, phantasmaSeriesID *bi
 		fees,
 		maxData,
 		expiry,
-	), nil
+	)
 }
 
 // MustBuildMintPhantasmaNonFungibleSingleTx builds a single-Phantasma-NFT mint transaction and panics on validation errors.
@@ -497,7 +567,10 @@ func BuildMintPhantasmaNonFungibleTxAndSign(tokenID uint64, signer cryptography.
 	if err != nil {
 		return nil, err
 	}
-	msg := BuildMintPhantasmaNonFungibleTx(tokenID, sender, receiver, tokens, fees, maxData, expiry)
+	msg, err := BuildMintPhantasmaNonFungibleTx(tokenID, sender, receiver, tokens, fees, maxData, expiry)
+	if err != nil {
+		return nil, err
+	}
 	return SignAndSerializeTxMsg(msg, signer)
 }
 

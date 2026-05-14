@@ -2,11 +2,7 @@ package util
 
 import "strings"
 
-// Checks API response string for errors.
+// ErrorDetect reports whether an API response string appears to contain an error.
 func ErrorDetect(s string) bool {
-	if strings.Contains(strings.ToLower(s), "error") {
-		return true
-	} else {
-		return false
-	}
+	return strings.Contains(strings.ToLower(s), "error")
 }

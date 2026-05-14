@@ -283,7 +283,11 @@ func objectFromFixture(t *testing.T, sourceKind, payload string) *VMObject {
 	case "object":
 		data := mustHex(t, payload)
 		if len(data) == cryptography.Length {
-			return &VMObject{Type: Object, Data: cryptography.NewAddress(data)}
+			address, err := cryptography.NewAddress(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return &VMObject{Type: Object, Data: address}
 		}
 		return &VMObject{Type: Object, Data: data}
 	case "struct":

@@ -26,7 +26,10 @@ func unstakeSoulToken(address crypto.Address, tokenAmount *big.Int) {
 	tx := chain.NewTransaction(netSelected, "main", script, uint32(expire), domain.SDKPayload)
 
 	// sign tx
-	tx.Sign(keyPair)
+	if err := tx.Sign(keyPair); err != nil {
+		fmt.Println("Signing transaction failed:", err)
+		return
+	}
 
 	fmt.Println("Tx script: " + hex.EncodeToString(script))
 
@@ -39,16 +42,16 @@ func unstakeSoulToken(address crypto.Address, tokenAmount *big.Int) {
 		return
 	}
 
-	txHash, err := client.SendRawTransaction(txHex)
+	txHash, err := client.SendRawTransaction(rpcContext, txHex)
 	if err != nil {
-		panic("Broadcasting tx failed! Error: " + err.Error())
-	} else {
-		if util.ErrorDetect(txHash) {
-			panic("Broadcasting tx failed! Error: " + txHash)
-		} else {
-			fmt.Println("Tx successfully broadcasted! Tx hash: " + txHash)
-		}
+		fmt.Println("Broadcasting tx failed:", err)
+		return
 	}
+	if util.ErrorDetect(txHash) {
+		fmt.Println("Broadcasting tx failed:", txHash)
+		return
+	}
+	fmt.Println("Tx successfully broadcasted! Tx hash: " + txHash)
 
 	waitForTransactionResult(txHash)
 }

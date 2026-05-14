@@ -24,6 +24,7 @@ type serializable interface {
 	Serialize(*BinWriter)
 }
 
+// Deserialize decodes data into a new value of type T.
 func Deserialize[T deserializable](data []byte) T {
 	br := NewBinReaderFromBuf(data)
 
@@ -36,6 +37,7 @@ func Deserialize[T deserializable](data []byte) T {
 	return object
 }
 
+// Serialize encodes object into its binary representation.
 func Serialize[T serializable](object T) []byte {
 	b := new(bytes.Buffer)
 	bw := NewBinWriterFromIO(b)

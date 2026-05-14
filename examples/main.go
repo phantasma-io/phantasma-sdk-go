@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 
@@ -12,15 +13,16 @@ import (
 var netSelected string
 var client rpc.PhantasmaRPC
 var chainTokens []response.TokenResult
+var rpcContext = context.Background()
 
-func getChainToken(symbol string) response.TokenResult {
+func getChainToken(symbol string) (response.TokenResult, bool) {
 	for _, t := range chainTokens {
 		if t.Symbol == symbol {
-			return t
+			return t, true
 		}
 	}
 
-	panic("Token not found")
+	return response.TokenResult{}, false
 }
 
 func menu() {
@@ -53,7 +55,11 @@ func chainStats() {
 
 	switch menuIndex {
 	case 1:
-		height, _ := client.GetBlockHeight("main")
+		height, err := client.GetBlockHeight(rpcContext, "main")
+		if err != nil {
+			fmt.Println("GetBlockHeight failed:", err)
+			return
+		}
 		fmt.Println("Latest block height:", height)
 	case 2:
 		printSoulmastersCount()
@@ -72,23 +78,39 @@ func misc() {
 		publicKeyHex := PromptStringInput("Enter public key in hex: ")
 		publicKey, err := hex.DecodeString(publicKeyHex)
 		if err != nil {
-			panic(err)
+			fmt.Println("Invalid public key hex:", err)
+			return
 		}
 
 		if len(publicKey) == cryptography.Length {
 			// This is the only correct way, address should have 34 bytes.
 			// 1 byte for type, 1 byte is reserved (must be 0) and then 32 bytes of public key.
-			fmt.Println("Address: ", cryptography.NewAddress(publicKey).String())
+			address, err := cryptography.NewAddress(publicKey)
+			if err != nil {
+				fmt.Println("Invalid public key:", err)
+				return
+			}
+			fmt.Println("Address: ", address.String())
 		} else if len(publicKey) == 33 {
 			publicKey = append([]byte{byte(cryptography.User)}, publicKey...)
 			fmt.Println("[33 bytes] * DON'T USE THIS ADDRESS * Address type is missing, using User by default: ")
-			fmt.Println(cryptography.NewAddress(publicKey).String())
+			address, err := cryptography.NewAddress(publicKey)
+			if err != nil {
+				fmt.Println("Invalid public key:", err)
+				return
+			}
+			fmt.Println(address.String())
 		} else if len(publicKey) == 32 {
 			// We use only '0x00' reserved byte for 2nd byte.
 			publicKey = append([]byte{byte(cryptography.User), 0x00}, publicKey...)
 
 			fmt.Println("[32 bytes] * DON'T USE THESE ADDRESSES * Address type is missing, using User by default: ")
-			fmt.Println(cryptography.NewAddress(publicKey).String())
+			address, err := cryptography.NewAddress(publicKey)
+			if err != nil {
+				fmt.Println("Invalid public key:", err)
+				return
+			}
+			fmt.Println(address.String())
 		}
 
 	case 2:
@@ -105,7 +127,12 @@ func main() {
 		client = rpc.NewRPCMainnet()
 	}
 
-	chainTokens, _ = client.GetTokens(false)
+	var err error
+	chainTokens, err = client.GetTokens(rpcContext, false)
+	if err != nil {
+		fmt.Println("GetTokens failed:", err)
+		return
+	}
 	fmt.Println("Received information about", len(chainTokens), netSelected, "tokens")
 
 	// t := getChainToken("SOUL")

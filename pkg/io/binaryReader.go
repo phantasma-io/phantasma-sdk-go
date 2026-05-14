@@ -183,6 +183,8 @@ func (r *BinReader) ReadBigInteger() *big.Int {
 	return util.BigIntFromCsharpOrPhantasmaByteArray(b)
 }
 
+// ReadBigIntegerToString reads a big integer and returns its base-10 decimal
+// representation.
 func (r *BinReader) ReadBigIntegerToString() string {
 	if r.Err != nil {
 		return big.NewInt(0).String()

@@ -37,97 +37,133 @@ type ProofOfAddressesVerifier struct {
 	Neo2SignatureBytes []byte
 }
 
-func NewProofOfAddressesVerifier(message string) *ProofOfAddressesVerifier {
+// NewProofOfAddressesVerifier parses a signed proof-of-addresses message.
+func NewProofOfAddressesVerifier(message string) (*ProofOfAddressesVerifier, error) {
 	v := &ProofOfAddressesVerifier{}
 	v.Message = message
 
 	split := strings.Split(strings.Replace(v.Message, "\r", "", -1), "\n")
+	if len(split) < 10 {
+		return nil, fmt.Errorf("proof message has %d lines, expected at least 10", len(split))
+	}
 
 	v.SignedMessage = strings.Join(split[:6], "\n")
-	fmt.Printf("v.SignedMessage: %s\n", v.SignedMessage)
 	v.SignedMessageBytes = []byte(v.SignedMessage)
 
-	v.PhaAddress = split[1][19:]
-	fmt.Printf("v.PhaAddress: %s\n", v.PhaAddress)
+	var err error
+	v.PhaAddress, err = proofField(split[1], "Phantasma address: ")
+	if err != nil {
+		return nil, err
+	}
 	phaAddress, err := cryptography.FromString(v.PhaAddress)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	v.PhaPublicKeyBytes = phaAddress.GetPublicKey()
+	v.PhaPublicKeyBytes, err = phaAddress.GetPublicKey()
+	if err != nil {
+		return nil, err
+	}
 
-	v.EthAddress = split[2][18:]
-	fmt.Printf("v.EthAddress: %s\n", v.EthAddress)
-	v.EthPublicKey = split[3][21:]
-	fmt.Printf("v.EthPublicKey: %s\n", v.EthPublicKey)
+	v.EthAddress, err = proofField(split[2], "Ethereum address: ")
+	if err != nil {
+		return nil, err
+	}
+	v.EthPublicKey, err = proofField(split[3], "Ethereum public key: ")
+	if err != nil {
+		return nil, err
+	}
 	v.EthPublicKeyBytes, err = hex.DecodeString(v.EthPublicKey)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	fmt.Printf("v.EthPublicKey (HEX): 0x%s\n", hex.EncodeToString(v.EthPublicKeyBytes))
 
-	v.Neo2Address = split[4][20:]
-	fmt.Printf("v.Neo2Address: %s\n", v.Neo2Address)
-	v.Neo2PublicKey = split[5][23:]
-	fmt.Printf("v.Neo2PublicKey: %s\n", v.Neo2PublicKey)
+	v.Neo2Address, err = proofField(split[4], "Neo Legacy address: ")
+	if err != nil {
+		return nil, err
+	}
+	v.Neo2PublicKey, err = proofField(split[5], "Neo Legacy public key: ")
+	if err != nil {
+		return nil, err
+	}
 	v.Neo2PublicKeyBytes, err = hex.DecodeString(v.Neo2PublicKey)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	v.PhaSignature = split[7][21:]
-	fmt.Printf("v.PhaSignature: %s\n", v.PhaSignature)
+	v.PhaSignature, err = proofField(split[7], "Phantasma signature: ")
+	if err != nil {
+		return nil, err
+	}
 	v.PhaSignatureBytes, err = hex.DecodeString(v.PhaSignature)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	v.EthSignature = split[8][20:]
-	fmt.Printf("v.EthSignature: %s\n", v.EthSignature)
+	v.EthSignature, err = proofField(split[8], "Ethereum signature: ")
+	if err != nil {
+		return nil, err
+	}
 	v.EthSignatureBytes, err = hex.DecodeString(v.EthSignature)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	fmt.Printf("v.EthSignatureBytes len: %d\n", len(v.EthSignatureBytes))
-	fmt.Printf("v.EthSignature (HEX): 0x%s\n", hex.EncodeToString(v.EthSignatureBytes))
 
-	v.Neo2Signature = split[9][22:]
-	fmt.Printf("v.Neo2Signature: %s\n", v.Neo2Signature)
+	v.Neo2Signature, err = proofField(split[9], "Neo Legacy signature: ")
+	if err != nil {
+		return nil, err
+	}
 	v.Neo2SignatureBytes, err = hex.DecodeString(v.Neo2Signature)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return v
+	return v, nil
 }
 
-func (v *ProofOfAddressesVerifier) VerifyMessage() (bool, string) {
+func proofField(line string, prefix string) (string, error) {
+	if !strings.HasPrefix(line, prefix) {
+		return "", fmt.Errorf("proof line %q does not start with %q", line, prefix)
+	}
+	return strings.TrimSpace(strings.TrimPrefix(line, prefix)), nil
+}
+
+// VerifyMessage verifies all signatures and address derivations in the proof.
+func (v *ProofOfAddressesVerifier) VerifyMessage() (bool, string, error) {
 	success := true
 	errorMessage := ""
+
+	if len(v.PhaPublicKeyBytes) != ed25519.PublicKeySize {
+		return false, errorMessage, fmt.Errorf("phantasma public key length must be %d but length is %d", ed25519.PublicKeySize, len(v.PhaPublicKeyBytes))
+	}
+	if len(v.PhaSignatureBytes) != ed25519.SignatureSize {
+		return false, errorMessage, fmt.Errorf("phantasma signature length must be %d but length is %d", ed25519.SignatureSize, len(v.PhaSignatureBytes))
+	}
 
 	if !ed25519.Verify(v.PhaPublicKeyBytes, v.SignedMessageBytes, v.PhaSignatureBytes) {
 		success = false
 		errorMessage += "Phantasma signature is incorrect!\n"
 	}
 
-	fmt.Println(len(v.EthSignatureBytes))
 	ethRes, err := ecdsa.Verify(v.SignedMessageBytes, v.EthSignatureBytes, v.EthPublicKeyBytes, ecdsa.Secp256k1)
 	if err != nil {
-		panic(err)
+		return false, errorMessage, err
 	}
 	if !ethRes {
 		success = false
 		errorMessage += "Ethereum signature is incorrect!\n"
 	}
 
-	fmt.Println(len(v.Neo2SignatureBytes))
 	neoRes, err := ecdsa.Verify(v.SignedMessageBytes, v.Neo2SignatureBytes, v.Neo2PublicKeyBytes, ecdsa.Secp256r1)
 	if err != nil {
-		panic(err)
+		return false, errorMessage, err
 	}
 	if !neoRes {
 		success = false
 		errorMessage += "Neo Legacy signature is incorrect!\n"
 	}
 
-	pubEth := ecdsa.PublicKeyUnmarshal(v.EthPublicKeyBytes, ecc.P256k1())
+	pubEth, err := ecdsa.PublicKeyUnmarshal(v.EthPublicKeyBytes, ecc.P256k1())
+	if err != nil {
+		return false, errorMessage, err
+	}
 	ethAddressFromPublicKey := crypto.PubkeyToAddress(*pubEth).Hex()
 
 	if v.EthAddress != ethAddressFromPublicKey {
@@ -141,5 +177,5 @@ func (v *ProofOfAddressesVerifier) VerifyMessage() (bool, string) {
 		errorMessage += "Neo Legacy address is incorrect: " + neo2AddressFromPublicKey + "\n"
 	}
 
-	return success, errorMessage
+	return success, errorMessage, nil
 }

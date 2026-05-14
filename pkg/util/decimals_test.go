@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTrimWholePrefix(t *testing.T) {
@@ -73,6 +74,8 @@ var decimalsTestData []DecimalsTestData = []DecimalsTestData{
 	{"-1", "-1", "-10", "-10", 1, ".", true},
 	{"1", "1", "1", "1", 0, ".", true},
 	{"-1", "-1", "-1", "-1", 0, ".", true},
+	{"1", "1.0", "1", "1", 0, ".", true},
+	{"-1", "-1.0", "-1", "-1", 0, ".", true},
 	{"1", "1", "10000000000", "010000000000", 10, ".", true},
 	{"-1", "-01", "-10000000000", "-010000000000", 10, ".", true},
 	{"1.1", "1.1", "11000000000", "11000000000", 10, ".", true},
@@ -99,17 +102,26 @@ func TestConvertDecimalsEx(t *testing.T) {
 }
 
 func TestConvertDecimalsBackEx(t *testing.T) {
-	assert.Panics(t, func() { ConvertDecimalsBackEx("0.0000000001", 0, ".", false) })
+	_, err := ConvertDecimalsBackEx("0.0000000001", 0, ".")
+	require.Error(t, err)
 
 	for _, d := range decimalsTestData {
-		assert.Equal(t, d.stringNoDecimalsRef, ConvertDecimalsBackEx(d.stringWithDecimals, d.decimals, d.separator, d.panicIfRoundingNeeded))
+		value, err := ConvertDecimalsBackEx(d.stringWithDecimals, d.decimals, d.separator)
+		if !d.panicIfRoundingNeeded {
+			require.Error(t, err)
+			continue
+		}
+		require.NoError(t, err)
+		assert.Equal(t, d.stringNoDecimalsRef, value)
 	}
 }
 
 func TestConvertDecimalsBack(t *testing.T) {
 	for _, d := range decimalsTestData {
-		if d.separator != "," && d.panicIfRoundingNeeded != false {
-			assert.Equal(t, d.stringNoDecimalsRef, ConvertDecimalsBack(d.stringWithDecimals, d.decimals).String())
+		if d.separator != "," && d.panicIfRoundingNeeded {
+			value, err := ConvertDecimalsBack(d.stringWithDecimals, d.decimals)
+			require.NoError(t, err)
+			assert.Equal(t, d.stringNoDecimalsRef, value.String())
 		}
 	}
 }

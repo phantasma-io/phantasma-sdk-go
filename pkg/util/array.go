@@ -9,7 +9,7 @@ func ArrayCloneAndReverse[T any](a []T) []T {
 	return dest
 }
 
-// Returns copy of given array
+// ArrayClone returns a copy of the given slice.
 func ArrayClone[T any](a []T) []T {
 	clone := make([]T, len(a))
 	copy(clone, a)

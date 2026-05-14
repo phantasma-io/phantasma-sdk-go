@@ -35,14 +35,25 @@ func TestEd25519GoldenVectors(t *testing.T) {
 		publicKey := mustHex(t, vector.publicKeyHex)
 		expectedSignature := mustHex(t, vector.signatureHex)
 
-		keys := NewPhantasmaKeys(seed)
+		keys, err := NewPhantasmaKeys(seed)
+		if err != nil {
+			t.Fatalf("%s key creation failed: %v", vector.caseID, err)
+		}
 		if got := hex.EncodeToString(keys.PublicKey()); got != vector.publicKeyHex {
 			t.Fatalf("%s public key mismatch: got %s", vector.caseID, got)
 		}
-		if !NewEd25519Signature(expectedSignature).Verify(message, []Address{keys.Address()}) {
+		expected, err := NewEd25519Signature(expectedSignature)
+		if err != nil {
+			t.Fatalf("%s expected signature creation failed: %v", vector.caseID, err)
+		}
+		if !expected.Verify(message, []Address{keys.Address()}) {
 			t.Fatalf("%s expected signature does not verify through SDK address", vector.caseID)
 		}
-		signature := keys.Sign(message).Bytes()
+		signatureObject, err := keys.Sign(message)
+		if err != nil {
+			t.Fatalf("%s signing failed: %v", vector.caseID, err)
+		}
+		signature := signatureObject.Bytes()
 		if len(signature) != 65 || signature[0] != 64 {
 			t.Fatalf("%s serialized signature has unexpected shape", vector.caseID)
 		}

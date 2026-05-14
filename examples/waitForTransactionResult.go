@@ -7,7 +7,12 @@ import (
 
 func waitForTransactionResult(txHash string) {
 	for {
-		txResult, _ := client.GetTransaction(txHash)
+		txResult, err := client.GetTransaction(rpcContext, txHash)
+		if err != nil {
+			fmt.Println("GetTransaction failed:", err)
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
 		fmt.Println("Tx state: " + fmt.Sprint(txResult.State))
 
 		if txResult.StateIsSuccess() {

@@ -6,6 +6,7 @@ import (
 	"github.com/phantasma-io/phantasma-sdk-go/pkg/cryptography"
 	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewTx(t *testing.T) {
@@ -28,8 +29,9 @@ func TestTxSign(t *testing.T) {
 	assert.Equal(t, "main", tx.ChainName)
 	assert.Equal(t, tx.Hash.String(), "b049d3bf5449191d3eb8ea3ea9cdace3712775d509c96ff8743266298e4b077a")
 
-	kp := cryptography.NewPhantasmaKeys([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x30, 0x31, 0x32})
-	tx.Sign(kp)
+	kp, err := cryptography.NewPhantasmaKeys([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x30, 0x31, 0x32})
+	require.NoError(t, err)
+	require.NoError(t, tx.Sign(kp))
 
 	assert.True(t, len(tx.Signatures) == 1)
 	sigBytes := tx.Signatures[0].Bytes()
@@ -44,12 +46,13 @@ func TestTxSerialization(t *testing.T) {
 	assert.Equal(t, []byte{7, 109, 97, 105, 110, 110, 101, 116, 4, 109, 97, 105, 110, 3, 1, 2, 3, 79, 239, 196, 96, 0}, tx.BytesEx(false))
 
 	bw := *io.NewBufBinWriter()
-	tx.SerializeEx(bw.BinWriter, false)
+	tx.SerializeEx(bw.BinWriter, true)
 	bytes := bw.Bytes()
 
 	newTx := Transaction{}
 	br := *io.NewBinReaderFromBuf(bytes)
 	newTx.Deserialize(&br)
+	require.NoError(t, br.Err)
 	assert.Equal(t, tx.ChainName, newTx.ChainName)
 	assert.Equal(t, tx.NexusName, newTx.NexusName)
 	assert.Equal(t, tx.Hash, newTx.Hash)
@@ -92,4 +95,35 @@ func TestTxSerializationSkipsNilSignatures(t *testing.T) {
 		newTx := io.Deserialize[*Transaction](bytes)
 		assert.Empty(t, newTx.Signatures)
 	})
+}
+
+func TestTxSignedSerializationRoundTrip(t *testing.T) {
+	tx := NewTransaction("mainnet", "main", []byte{0x01, 0x02, 0x03}, 1623519055, []byte("payload"))
+	kp, err := cryptography.NewPhantasmaKeys([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x30, 0x31, 0x32})
+	require.NoError(t, err)
+	require.NoError(t, tx.Sign(kp))
+
+	br := io.NewBinReaderFromBuf(tx.Bytes())
+	newTx := Transaction{}
+	newTx.Deserialize(br)
+	require.NoError(t, br.Err)
+
+	require.Len(t, newTx.Signatures, 1)
+	assert.Equal(t, tx.Hash, newTx.Hash)
+	assert.Equal(t, tx.Signatures[0].Kind(), newTx.Signatures[0].Kind())
+	assert.Equal(t, tx.Signatures[0].Bytes(), newTx.Signatures[0].Bytes())
+	assert.True(t, newTx.IsSignedBy([]cryptography.Address{kp.Address()}))
+	assert.Equal(t, tx.Bytes(), newTx.Bytes())
+}
+
+func TestTxDeserializeRejectsUnsupportedSignatureKind(t *testing.T) {
+	tx := NewTransaction("mainnet", "main", []byte{0x01, 0x02, 0x03}, 1623519055, nil)
+	data := append(tx.BytesEx(false), 1, 99)
+
+	br := io.NewBinReaderFromBuf(data)
+	newTx := Transaction{}
+	newTx.Deserialize(br)
+
+	require.Error(t, br.Err)
+	assert.Contains(t, br.Err.Error(), "unsupported transaction signature kind")
 }

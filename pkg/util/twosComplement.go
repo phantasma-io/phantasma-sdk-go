@@ -2,11 +2,13 @@ package util
 
 // https://en.wikipedia.org/wiki/Two%27s_complement
 
+// TwosComplementConvertTo converts magnitude bytes in place to two's-complement form.
 func TwosComplementConvertTo(bytes []byte) {
 	flipBits(bytes)
 	addOneIgnoringOverflow(bytes)
 }
 
+// TwosComplementConvertFrom converts two's-complement bytes in place to magnitude bytes.
 func TwosComplementConvertFrom(bytes []byte) {
 	subtractOneIgnoringOverflow(bytes)
 	flipBits(bytes)
@@ -15,7 +17,7 @@ func TwosComplementConvertFrom(bytes []byte) {
 func addOneIgnoringOverflow(bytes []byte) {
 	for i := len(bytes) - 1; i >= 0; i-- {
 		if bytes[i] < 255 {
-			bytes[i] += 1
+			bytes[i]++
 			return
 		}
 		bytes[i] = 0
@@ -28,7 +30,7 @@ func addOneIgnoringOverflow(bytes []byte) {
 func subtractOneIgnoringOverflow(bytes []byte) {
 	for i := len(bytes) - 1; i >= 0; i-- {
 		if bytes[i] > 0 {
-			bytes[i] -= 1
+			bytes[i]--
 			return
 		}
 		bytes[i] = 255

@@ -20,7 +20,7 @@ func printBytes(message string, bytes []byte) {
 	fmt.Printf("]\n")
 }
 
-func BigIntTestConversions(t *testing.T, d TestData) {
+func bigIntTestConversions(t *testing.T, d bigIntTestData) {
 	bi, _ := big.NewInt(0).SetString(d.number, 10)
 	fmt.Printf("\n%s\n", bi)
 
@@ -77,6 +77,6 @@ func BigIntTestConversions(t *testing.T, d TestData) {
 
 func TestBigInteger(t *testing.T) {
 	for _, a := range testData {
-		BigIntTestConversions(t, a)
+		bigIntTestConversions(t, a)
 	}
 }

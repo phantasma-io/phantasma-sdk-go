@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -12,12 +13,10 @@ import (
 	hashing "github.com/phantasma-io/phantasma-sdk-go/pkg/util/hashing"
 )
 
-// TODO Hash.Null
-
-// HashLength const
+// HashLength is the number of bytes in a Phantasma hash.
 const HashLength = 32
 
-// HexPrefix const
+// HexPrefix is the optional prefix accepted by ParseHash.
 const HexPrefix = "0x"
 
 // Hash stores a 32-byte transaction, block or content hash.
@@ -25,23 +24,23 @@ type Hash struct {
 	_data []byte
 }
 
-// HashFromBytes returns a Hash based on the passed in byte slice
+// HashFromBytes returns a Hash from a 32-byte slice or hashes arbitrary data into one.
 func HashFromBytes(data []byte) (Hash, error) {
 
 	if len(data) != HashLength {
 		data = hashing.Sha256(data)
 	}
 
-	return Hash{_data: data}, nil
+	return Hash{_data: append([]byte(nil), data...)}, nil
 }
 
-// HashFromString creates an instance of Hash from a string
+// HashFromString creates an instance of Hash from a string.
 func HashFromString(s string) Hash {
 	data := hashing.Sha256([]byte(s))
-	return Hash{data}
+	return Hash{append([]byte(nil), data...)}
 }
 
-// ParseHash parses a string resulting in a Hash
+// ParseHash parses a public hex hash string.
 func ParseHash(s string) (Hash, error) {
 
 	if strings.HasPrefix(s, HexPrefix) {
@@ -58,7 +57,7 @@ func ParseHash(s string) (Hash, error) {
 	}
 
 	slices.Reverse(data)
-	return Hash{data}, nil
+	return Hash{append([]byte(nil), data...)}, nil
 }
 
 // Size returns the length of the underlying byte slice
@@ -76,18 +75,18 @@ func (h Hash) IsNull() bool {
 	return bytes.Equal(h._data, empty)
 }
 
-// String creates the a base16 encoded representation of Hash
+// String returns the canonical public hex representation of the hash.
 func (h Hash) String() string {
 	data := util.ArrayCloneAndReverse(h._data)
 	return hex.EncodeToString(data)
 }
 
-// Bytes returns the bytes of the hash
+// Bytes returns a copy of the internal little-endian hash bytes.
 func (h Hash) Bytes() []byte {
-	return h._data
+	return append([]byte(nil), h._data...)
 }
 
-// FromUnpaddedHex creates an instance of Hash from an unpadded hex string
+// FromUnpaddedHex creates an instance of Hash from an unpadded hex string.
 func (h Hash) FromUnpaddedHex(s string) (Hash, error) {
 
 	if strings.HasPrefix(s, HexPrefix) {
@@ -121,12 +120,20 @@ func (h Hash) GetDifficulty() int {
 	return 256 - result
 }
 
-// Serialize implements ther Serializable interface
+// Serialize implements the Serializable interface.
 func (h *Hash) Serialize(writer *io.BinWriter) {
 	writer.WriteVarBytes(h._data)
 }
 
-// Deserialize implements ther Serializable interface
+// Deserialize implements the Serializable interface.
 func (h *Hash) Deserialize(reader *io.BinReader) {
-	h._data = reader.ReadVarBytes()
+	data := reader.ReadVarBytes(HashLength)
+	if reader.Err != nil {
+		return
+	}
+	if len(data) != 0 && len(data) != HashLength {
+		reader.Err = fmt.Errorf("invalid hash byte length: got %d, want %d", len(data), HashLength)
+		return
+	}
+	h._data = append([]byte(nil), data...)
 }

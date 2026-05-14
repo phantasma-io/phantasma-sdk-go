@@ -27,7 +27,8 @@ func wallet() {
 	var err error
 	keyPair, err = cryptography.FromWIF(wif)
 	if err != nil {
-		panic("Creating keyPair failed!")
+		fmt.Println("Creating key pair failed:", err)
+		return
 	}
 
 	goBack := false
@@ -85,9 +86,17 @@ func sendFungibleTokens() {
 	tokenSymbol := balances[tokenIndex].Symbol
 
 	_, tokenAmountStr := PromptBigFloatInput("Enter amount:", big.NewFloat(0), balances[tokenIndex].ConvertDecimalsToFloat())
-	tokenAmount := util.ConvertDecimalsBack(tokenAmountStr, int(balances[tokenIndex].Decimals))
+	tokenAmount, err := util.ConvertDecimalsBack(tokenAmountStr, int(balances[tokenIndex].Decimals))
+	if err != nil {
+		fmt.Println("Invalid amount:", err)
+		return
+	}
 
-	toAddress, _ := cryptography.FromString(to)
+	toAddress, err := cryptography.FromString(to)
+	if err != nil {
+		fmt.Println("Invalid destination address:", err)
+		return
+	}
 	sendFungibleToken(tokenSymbol, toAddress, tokenAmount)
 }
 
@@ -107,7 +116,11 @@ func staking() {
 		return
 	}
 
-	t := getChainToken("SOUL")
+	t, ok := getChainToken("SOUL")
+	if !ok {
+		fmt.Println("SOUL token not found")
+		return
+	}
 
 	var amountLimit *big.Float
 	if stakeMode {
@@ -116,7 +129,11 @@ func staking() {
 		amountLimit = stakedSoul
 	}
 	_, tokenAmountStr := PromptBigFloatInput("Enter amount:", big.NewFloat(0), amountLimit)
-	tokenAmount := util.ConvertDecimalsBack(tokenAmountStr, int(t.Decimals))
+	tokenAmount, err := util.ConvertDecimalsBack(tokenAmountStr, int(t.Decimals))
+	if err != nil {
+		fmt.Println("Invalid amount:", err)
+		return
+	}
 
 	if stakeMode {
 		stakeSoulToken(keyPair.Address(), tokenAmount)

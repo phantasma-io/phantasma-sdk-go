@@ -7,14 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSignatureDropRecoveryId(t *testing.T) {
+func TestSignatureDropRecoveryID(t *testing.T) {
 	signatureWithRIDBytes, err := hex.DecodeString(k1SignatureRefWithRID)
 	if err != nil {
 		panic(err)
 	}
 
-	result := SignatureDropRecoveryId(signatureWithRIDBytes)
-	result2 := SignatureDropRecoveryId(result)
+	result := SignatureDropRecoveryID(signatureWithRIDBytes)
+	result2 := SignatureDropRecoveryID(result)
 
 	// Method should not modify input array
 	assert.Equal(t, k1SignatureRefWithRID, hex.EncodeToString(signatureWithRIDBytes))
@@ -31,8 +31,11 @@ func TestSignatureToRSConversions(t *testing.T) {
 			panic(err)
 		}
 
-		r, s := SignatureToRS(signatureBytes)
-		signatureBytesRecreated := RSToSignatureWithoutRecoveryId(r, s)
+		r, s, err := SignatureToRS(signatureBytes)
+		if err != nil {
+			panic(err)
+		}
+		signatureBytesRecreated := RSToSignatureWithoutRecoveryID(r, s)
 		assert.Equal(t, signatureBytes, signatureBytesRecreated)
 	}
 
@@ -42,8 +45,16 @@ func TestSignatureToRSConversions(t *testing.T) {
 			panic(err)
 		}
 
-		r, s := SignatureToRS(signatureBytes)
-		signatureBytesRecreated := RSToSignatureWithoutRecoveryId(r, s)
+		r, s, err := SignatureToRS(signatureBytes)
+		if err != nil {
+			panic(err)
+		}
+		signatureBytesRecreated := RSToSignatureWithoutRecoveryID(r, s)
 		assert.Equal(t, signatureBytes, signatureBytesRecreated)
 	}
+}
+
+func TestSignatureToRSRejectsMalformedInput(t *testing.T) {
+	_, _, err := SignatureToRS([]byte{1, 2, 3})
+	assert.Error(t, err)
 }

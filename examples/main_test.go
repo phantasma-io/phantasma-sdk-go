@@ -11,16 +11,17 @@ import (
 func TestGetChainToken(t *testing.T) {
 	chainTokens = []response.TokenResult{{Symbol: "SOUL"}}
 
-	token := getChainToken("SOUL")
+	token, ok := getChainToken("SOUL")
+	if !ok {
+		t.Fatal("expected SOUL token to be found")
+	}
 	if token.Symbol != "SOUL" {
 		t.Fatalf("expected SOUL token, got %+v", token)
 	}
-	defer func() {
-		if recover() == nil {
-			t.Fatalf("missing token must panic")
-		}
-	}()
-	_ = getChainToken("KCAL")
+	_, ok = getChainToken("KCAL")
+	if ok {
+		t.Fatal("missing token must not be found")
+	}
 }
 
 func TestReadConsoleLineAcceptsFinalEOFToken(t *testing.T) {
