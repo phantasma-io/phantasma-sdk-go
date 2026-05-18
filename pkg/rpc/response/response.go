@@ -2,6 +2,7 @@ package response
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"slices"
@@ -29,14 +30,16 @@ type BalanceResult struct {
 	Amount   string   `json:"amount"`
 	Symbol   string   `json:"symbol"`
 	Decimals uint     `json:"decimals"`
-	Ids      []string `json:"ids"`
+	Ids      []string `json:"ids,omitempty"`
 }
 
 // Clone returns a deep copy of the balance result.
 func (b BalanceResult) Clone() *BalanceResult {
 	clone := b
-	clone.Ids = make([]string, len(b.Ids))
-	copy(clone.Ids, b.Ids)
+	if b.Ids != nil {
+		clone.Ids = make([]string, len(b.Ids))
+		copy(clone.Ids, b.Ids)
+	}
 
 	return &clone
 }
@@ -75,9 +78,9 @@ type GovernanceResult struct {
 
 // OrganizationResult describes an organization and its members.
 type OrganizationResult struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Members []string `json:"members"`
+	ID      *string  `json:"id,omitempty"`
+	Name    *string  `json:"name,omitempty"`
+	Members []string `json:"members,omitempty"`
 }
 
 // CrowdsaleResult describes a crowdsale contract state.
@@ -99,13 +102,13 @@ type CrowdsaleResult struct {
 
 // NexusResult describes nexus-level metadata.
 type NexusResult struct {
-	Name          string             `json:"name"`
+	Name          *string            `json:"name,omitempty"`
 	Protocol      uint               `json:"protocol"`
-	Platforms     []PlatformResult   `json:"platforms"`
-	Tokens        []TokenResult      `json:"tokens"`
-	Chains        []ChainResult      `json:"chains"`
-	Governance    []GovernanceResult `json:"governance"`
-	Organizations []string           `json:"organizations"`
+	Platforms     []PlatformResult   `json:"platforms,omitempty"`
+	Tokens        []TokenResult      `json:"tokens,omitempty"`
+	Chains        []ChainResult      `json:"chains,omitempty"`
+	Governance    []GovernanceResult `json:"governance,omitempty"`
+	Organizations []string           `json:"organizations,omitempty"`
 }
 
 // StakeResult describes an account stake and unclaimed reward state.
@@ -141,15 +144,23 @@ type AccountResult struct {
 	Stakes    StakeResult     `json:"stakes"`
 	Stake     string          `json:"stake"`
 	Unclaimed string          `json:"unclaimed"`
-	Relay     string          `json:"relay"`
+	Relay     *string         `json:"relay,omitempty"`
 	Validator string          `json:"validator"`
 	Storage   StorageResult   `json:"storage"`
 	Balances  []BalanceResult `json:"balances"`
+	Txs       []string        `json:"txs,omitempty"`
 }
 
 // Clone returns a deep copy of the account result.
 func (a AccountResult) Clone() *AccountResult {
 	clone := a
+	if a.Relay != nil {
+		relay := *a.Relay
+		clone.Relay = &relay
+	}
+	if a.Txs != nil {
+		clone.Txs = append([]string(nil), a.Txs...)
+	}
 	clone.Balances = make([]BalanceResult, len(a.Balances))
 	for i, b := range a.Balances {
 		clone.Balances[i] = *b.Clone()
@@ -190,8 +201,8 @@ type LeaderboardRowResult struct {
 
 // LeaderboardResult describes a named leaderboard.
 type LeaderboardResult struct {
-	Name string                 `json:"name"`
-	Rows []LeaderboardRowResult `json:"rows"`
+	Name *string                `json:"name,omitempty"`
+	Rows []LeaderboardRowResult `json:"rows,omitempty"`
 }
 
 // DappResult describes an application deployed on a chain.
@@ -203,13 +214,13 @@ type DappResult struct {
 
 // ChainResult describes a chain in the nexus.
 type ChainResult struct {
-	Name         string   `json:"name"`
-	Address      string   `json:"address"`
-	Parent       string   `json:"parent"`
+	Name         *string  `json:"name,omitempty"`
+	Address      *string  `json:"address,omitempty"`
+	Parent       *string  `json:"parent,omitempty"`
 	Height       uint     `json:"height"`
-	Organization string   `json:"organization"`
-	Contracts    []string `json:"contracts"`
-	Dapps        []string `json:"dapps"`
+	Organization *string  `json:"organization,omitempty"`
+	Contracts    []string `json:"contracts,omitempty"`
+	Dapps        []string `json:"dapps,omitempty"`
 }
 
 // EventResult describes one event emitted by a transaction or script invocation.
@@ -217,7 +228,18 @@ type EventResult struct {
 	Address  string `json:"address"`
 	Contract string `json:"contract"`
 	Kind     string `json:"kind"`
+	Name     string `json:"name"`
 	Data     string `json:"data"`
+}
+
+func (e *EventResult) UnmarshalJSON(data []byte) error {
+	data, err := stripExactFields(data, "Kind", "Data")
+	if err != nil {
+		return err
+	}
+
+	type eventResult EventResult
+	return json.Unmarshal(data, (*eventResult)(e))
 }
 
 // OracleResult describes oracle data attached to a block or script result.
@@ -228,25 +250,62 @@ type OracleResult struct {
 
 // SignatureResult describes a transaction signature.
 type SignatureResult struct {
-	Kind string `json:"Kind"`
-	Data string `json:"Data"`
+	Kind string `json:"kind"`
+	Data string `json:"data"`
+}
+
+func (s *SignatureResult) UnmarshalJSON(data []byte) error {
+	data, err := stripExactFields(data, "Kind", "Data")
+	if err != nil {
+		return err
+	}
+
+	type signatureResult SignatureResult
+	return json.Unmarshal(data, (*signatureResult)(s))
+}
+
+// EventExResult describes one extended transaction event returned by current RPC nodes.
+type EventExResult struct {
+	Address  string      `json:"address"`
+	Contract string      `json:"contract"`
+	Kind     string      `json:"kind"`
+	Data     interface{} `json:"data"`
+}
+
+func (e *EventExResult) UnmarshalJSON(data []byte) error {
+	data, err := stripExactFields(data, "Kind", "Data")
+	if err != nil {
+		return err
+	}
+
+	type eventExResult EventExResult
+	return json.Unmarshal(data, (*eventExResult)(e))
 }
 
 // TransactionResult describes a transaction returned by RPC.
 type TransactionResult struct {
-	Hash         string            `json:"hash"`
-	ChainAddress string            `json:"chainAddress"`
-	Timestamp    uint              `json:"timestamp"`
-	BlockHeight  int               `json:"blockHeight"`
-	BlockHash    string            `json:"blockHash"`
-	Script       string            `json:"script"`
-	Payload      string            `json:"payload"`
-	Events       []EventResult     `json:"events"`
-	State        string            `json:"state"`
-	Result       string            `json:"result"`
-	Fee          string            `json:"fee"`
-	Signatures   []SignatureResult `json:"signatures"`
-	Expiration   uint              `json:"expiration"`
+	Hash           string            `json:"hash"`
+	ChainAddress   string            `json:"chainAddress"`
+	Timestamp      uint              `json:"timestamp"`
+	BlockHeight    int               `json:"blockHeight"`
+	BlockHash      string            `json:"blockHash"`
+	Script         string            `json:"script"`
+	Payload        string            `json:"payload"`
+	CarbonTxType   uint32            `json:"carbonTxType"`
+	CarbonTxData   string            `json:"carbonTxData"`
+	DebugComment   *string           `json:"debugComment,omitempty"`
+	Events         []EventResult     `json:"events"`
+	ExtendedEvents []EventExResult   `json:"extendedEvents"`
+	State          string            `json:"state"`
+	Result         string            `json:"result"`
+	Fee            string            `json:"fee"`
+	Signatures     []SignatureResult `json:"signatures"`
+	Sender         string            `json:"sender"`
+	GasPayer       string            `json:"gasPayer"`
+	GasTarget      string            `json:"gasTarget"`
+	GasPrice       string            `json:"gasPrice"`
+	GasLimit       string            `json:"gasLimit"`
+	Expiration     uint              `json:"expiration"`
 }
 
 // StateIsSuccess reports whether the transaction state is a success state.
@@ -271,8 +330,8 @@ type PaginatedResult[T any] struct {
 
 // CursorPaginatedResult represents Carbon cursor pagination.
 type CursorPaginatedResult[T any] struct {
-	Result T      `json:"result"`
-	Cursor string `json:"cursor"`
+	Result T       `json:"result"`
+	Cursor *string `json:"cursor,omitempty"`
 }
 
 // BlockResult describes a block and, when requested, its transactions/events.
@@ -286,8 +345,8 @@ type BlockResult struct {
 	Txs              []TransactionResult `json:"txs"`
 	ValidatorAddress string              `json:"validatorAddress"`
 	Reward           string              `json:"reward"`
-	Events           []EventResult       `json:"events"`
-	Oracles          []OracleResult      `json:"oracles"`
+	Events           []EventResult       `json:"events,omitempty"`
+	Oracles          []OracleResult      `json:"oracles,omitempty"`
 }
 
 // TokenExternalResult describes an external platform mapping for a token.
@@ -316,13 +375,23 @@ type TokenResult struct {
 	Address       string                `json:"address"`
 	Owner         string                `json:"owner"`
 	Flags         string                `json:"flags"`
-	Script        string                `json:"script"`
+	Script        *string               `json:"script,omitempty"`
 	Series        []TokenSeriesResult   `json:"series"`
 	CarbonID      string                `json:"carbonId"`
-	Metadata      []TokenPropertyResult `json:"metadata"`
+	Metadata      []TokenPropertyResult `json:"metadata,omitempty"`
 	TokenSchemas  *TokenSchemasResult   `json:"tokenSchemas"`
-	External      []TokenExternalResult `json:"external"`
-	Price         []TokenPriceResult    `json:"price"`
+	External      []TokenExternalResult `json:"external,omitempty"`
+	Price         []TokenPriceResult    `json:"price,omitempty"`
+}
+
+func (t *TokenResult) UnmarshalJSON(data []byte) error {
+	data, err := stripExactFields(data, "carbonID")
+	if err != nil {
+		return err
+	}
+
+	type tokenResult TokenResult
+	return json.Unmarshal(data, (*tokenResult)(t))
 }
 
 // IsBurnable reports whether the token has the Burnable flag.
@@ -380,17 +449,27 @@ type TokenSeriesResult struct {
 	MintCount      string                `json:"mintCount"`
 	CurrentSupply  string                `json:"currentSupply"`
 	MaxSupply      string                `json:"maxSupply"`
-	BurnedSupply   string                `json:"burnedSupply"`
-	Mode           string                `json:"mode"`
-	Script         string                `json:"script"`
-	Methods        []ABIMethodResult     `json:"methods"`
+	BurnedSupply   *string               `json:"burnedSupply,omitempty"`
+	Mode           *string               `json:"mode,omitempty"`
+	Script         *string               `json:"script,omitempty"`
+	Methods        []ABIMethodResult     `json:"methods,omitempty"`
 	Metadata       []TokenPropertyResult `json:"metadata"`
 }
 
 // TokenPropertyResult describes a token metadata key/value pair.
 type TokenPropertyResult struct {
-	Key   string `json:"Key"`
-	Value string `json:"Value"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func (p *TokenPropertyResult) UnmarshalJSON(data []byte) error {
+	data, err := stripExactFields(data, "Key", "Value")
+	if err != nil {
+		return err
+	}
+
+	type tokenPropertyResult TokenPropertyResult
+	return json.Unmarshal(data, (*tokenPropertyResult)(p))
 }
 
 // VMVariableSchemaResult describes a VM metadata field schema.
@@ -420,7 +499,7 @@ type TokenSchemasResult struct {
 
 // TokenDataResult describes one NFT instance.
 type TokenDataResult struct {
-	ID               string                `json:"ID"`
+	ID               string                `json:"id"`
 	Series           string                `json:"series"`
 	CarbonTokenID    string                `json:"carbonTokenId"`
 	CarbonSeriesID   string                `json:"carbonSeriesId"`
@@ -434,6 +513,16 @@ type TokenDataResult struct {
 	Status           string                `json:"status"`
 	Infusion         []TokenPropertyResult `json:"infusion"`
 	Properties       []TokenPropertyResult `json:"properties"`
+}
+
+func (t *TokenDataResult) UnmarshalJSON(data []byte) error {
+	data, err := stripExactFields(data, "ID")
+	if err != nil {
+		return err
+	}
+
+	type tokenDataResult TokenDataResult
+	return json.Unmarshal(data, (*tokenDataResult)(t))
 }
 
 // SendRawTxResult is the classic send-transaction response shape.
@@ -485,9 +574,12 @@ type AuctionResult struct {
 // ScriptResult describes a read-only script invocation result.
 type ScriptResult struct {
 	Events  []EventResult  `json:"events"`
-	Result  string         `json:"result"`
+	Result  string         `json:"result,omitempty"`
+	Error   *string        `json:"error,omitempty"`
 	Results []string       `json:"results"`
 	Oracles []OracleResult `json:"oracles"`
+	State   *string        `json:"state,omitempty"`
+	Gas     *string        `json:"gas,omitempty"`
 }
 
 // DecodeResultWithError decodes the hex-encoded Result field into a VMObject.
@@ -520,14 +612,14 @@ func decodeVMObjectHex(value string) (*vm.VMObject, error) {
 
 // ArchiveResult describes archive metadata.
 type ArchiveResult struct {
-	Name          string   `json:"name"`
-	Hash          string   `json:"hash"`
+	Name          *string  `json:"name,omitempty"`
+	Hash          *string  `json:"hash,omitempty"`
 	Time          uint     `json:"time"`
 	Size          uint     `json:"size"`
-	Encryption    string   `json:"encryption"`
+	Encryption    *string  `json:"encryption,omitempty"`
 	BlockCount    int      `json:"blockCount"`
-	MissingBlocks []int    `json:"missingBlocks"`
-	Owners        []string `json:"owners"`
+	MissingBlocks []int    `json:"missingBlocks,omitempty"`
+	Owners        []string `json:"owners,omitempty"`
 }
 
 // ABIParameterResult describes a contract ABI parameter.
@@ -556,8 +648,9 @@ type ContractResult struct {
 	Name    string            `json:"name"`
 	Address string            `json:"address"`
 	Script  string            `json:"script"`
-	Methods []ABIMethodResult `json:"methods"`
-	Events  []ABIEventResult  `json:"events"`
+	Owner   *string           `json:"owner,omitempty"`
+	Methods []ABIMethodResult `json:"methods,omitempty"`
+	Events  []ABIEventResult  `json:"events,omitempty"`
 }
 
 // ChannelResult describes a payment/storage channel.
@@ -612,4 +705,24 @@ type SwapResult struct {
 	DestinationAddress  string `json:"destinationAddress"`
 	Symbol              string `json:"symbol"`
 	Value               string `json:"value"`
+}
+
+func stripExactFields(data []byte, fields ...string) ([]byte, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+
+	changed := false
+	for _, field := range fields {
+		if _, ok := raw[field]; ok {
+			delete(raw, field)
+			changed = true
+		}
+	}
+
+	if !changed {
+		return data, nil
+	}
+	return json.Marshal(raw)
 }

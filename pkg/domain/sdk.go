@@ -1,3 +1,5 @@
 package domain
 
-var SDKPayload []byte = []byte("GO-SDK-v0.9.0")
+const SDKVersion = "0.10.0"
+
+var SDKPayload []byte = []byte("GO-SDK-v" + SDKVersion)

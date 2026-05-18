@@ -185,16 +185,16 @@ type RPCRequest struct {
 	JSONRPC string      `json:"jsonrpc"`
 }
 
-// rpcResponseID is the wire representation of a JSON-RPC response id. This
-// client uses numeric ids, but serializes requests as strings and Phantasma RPC
-// echoes that string value back.
+// rpcResponseID is the wire representation of a JSON-RPC response id. The SDK
+// exposes numeric ids, while some RPC servers echo those ids as JSON strings.
+// Null and missing ids are rejected by the decoder because they cannot be
+// correlated with a concrete request.
 type rpcResponseID int
 
 func (id *rpcResponseID) UnmarshalJSON(data []byte) error {
 	data = bytes.TrimSpace(data)
 	if bytes.Equal(data, []byte("null")) {
-		*id = 0
-		return nil
+		return errors.New("rpc response id is null")
 	}
 
 	var numericID int
@@ -218,29 +218,34 @@ func (id *rpcResponseID) UnmarshalJSON(data []byte) error {
 }
 
 type rpcResponseWire struct {
-	JSONRPC string        `json:"jsonrpc"`
-	Result  interface{}   `json:"result,omitempty"`
-	Error   *RPCError     `json:"error,omitempty"`
-	ID      rpcResponseID `json:"id"`
+	JSONRPC string         `json:"jsonrpc"`
+	Result  interface{}    `json:"result,omitempty"`
+	Error   *RPCError      `json:"error,omitempty"`
+	ID      *rpcResponseID `json:"id"`
 }
 
-func (response *rpcResponseWire) toRPCResponse() *RPCResponse {
+func (response *rpcResponseWire) toRPCResponse() (*RPCResponse, error) {
 	if response == nil {
-		return nil
+		return nil, nil
+	}
+	if response.ID == nil {
+		return nil, errors.New("rpc response id missing")
 	}
 
 	return &RPCResponse{
 		JSONRPC: response.JSONRPC,
 		Result:  response.Result,
 		Error:   response.Error,
-		ID:      int(response.ID),
-	}
+		ID:      int(*response.ID),
+	}, nil
 }
 
 func decodeRPCResponse(decoder *json.Decoder) (*RPCResponse, error) {
 	var response *rpcResponseWire
-	err := decoder.Decode(&response)
-	return response.toRPCResponse(), err
+	if err := decoder.Decode(&response); err != nil {
+		return nil, err
+	}
+	return response.toRPCResponse()
 }
 
 func decodeRPCResponses(decoder *json.Decoder) (RPCResponses, error) {
@@ -255,10 +260,66 @@ func decodeRPCResponses(decoder *json.Decoder) (RPCResponses, error) {
 
 	responses := make(RPCResponses, len(responseWires))
 	for i, responseWire := range responseWires {
-		responses[i] = responseWire.toRPCResponse()
+		response, err := responseWire.toRPCResponse()
+		if err != nil {
+			return nil, err
+		}
+		responses[i] = response
 	}
 
 	return responses, nil
+}
+
+func parseExpectedResponseID(request *RPCRequest) (int, error) {
+	if request == nil {
+		return 0, errors.New("rpc request missing")
+	}
+	id, err := strconv.Atoi(request.ID)
+	if err != nil {
+		return 0, fmt.Errorf("rpc request id %q is not a numeric JSON-RPC id: %w", request.ID, err)
+	}
+	return id, nil
+}
+
+func validateRPCResponseID(request *RPCRequest, response *RPCResponse) error {
+	expectedID, err := parseExpectedResponseID(request)
+	if err != nil {
+		return err
+	}
+	if response.ID != expectedID {
+		return fmt.Errorf("rpc response id mismatch: got %d, expected %d", response.ID, expectedID)
+	}
+	return nil
+}
+
+func validateRPCBatchResponseIDs(requests []*RPCRequest, responses []*RPCResponse) error {
+	expectedIDs := make(map[int]struct{}, len(requests))
+	for _, request := range requests {
+		expectedID, err := parseExpectedResponseID(request)
+		if err != nil {
+			return err
+		}
+		if _, exists := expectedIDs[expectedID]; exists {
+			return fmt.Errorf("rpc batch request id %d is duplicated", expectedID)
+		}
+		expectedIDs[expectedID] = struct{}{}
+	}
+
+	seenIDs := make(map[int]struct{}, len(responses))
+	for _, response := range responses {
+		if _, expected := expectedIDs[response.ID]; !expected {
+			return fmt.Errorf("rpc batch response id mismatch: got unexpected id %d", response.ID)
+		}
+		if _, exists := seenIDs[response.ID]; exists {
+			return fmt.Errorf("rpc batch response id %d is duplicated", response.ID)
+		}
+		seenIDs[response.ID] = struct{}{}
+	}
+
+	if len(seenIDs) != len(expectedIDs) {
+		return fmt.Errorf("rpc batch response count mismatch: got %d, expected %d", len(seenIDs), len(expectedIDs))
+	}
+	return nil
 }
 
 // NewRequest returns a new RPCRequest that can be created using the same convenient parameter syntax as Call()
@@ -268,6 +329,7 @@ func decodeRPCResponses(decoder *json.Decoder) (RPCResponses, error) {
 // e.g. NewRequest("myMethod", "Alex", 35, true)
 func NewRequest(method string, params ...interface{}) *RPCRequest {
 	request := &RPCRequest{
+		ID:      "0",
 		Method:  method,
 		Params:  Params(params...),
 		JSONRPC: jsonrpcVersion,
@@ -568,6 +630,9 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 		}
 		return nil, fmt.Errorf("rpc call %v() on %v status code: %v. rpc response missing", RPCRequest.Method, httpRequest.URL.Redacted(), httpResponse.StatusCode)
 	}
+	if err := validateRPCResponseID(RPCRequest, rpcResponse); err != nil {
+		return nil, fmt.Errorf("rpc call %v() on %v status code: %v. %w", RPCRequest.Method, httpRequest.URL.Redacted(), httpResponse.StatusCode, err)
+	}
 
 	// if we have a response body, but also a http error situation, return both
 	if httpResponse.StatusCode >= 400 {
@@ -632,6 +697,9 @@ func (client *rpcClient) doBatchCall(ctx context.Context, rpcRequest []*RPCReque
 		if rpcResponse == nil {
 			return nil, fmt.Errorf("rpc batch call on %v status code: %v. rpc response %v missing", httpRequest.URL.Redacted(), httpResponse.StatusCode, i)
 		}
+	}
+	if err := validateRPCBatchResponseIDs(rpcRequest, rpcResponses); err != nil {
+		return nil, fmt.Errorf("rpc batch call on %v status code: %v. %w", httpRequest.URL.Redacted(), httpResponse.StatusCode, err)
 	}
 
 	// if we have a response body, but also a http error, return both
