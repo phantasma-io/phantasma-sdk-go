@@ -3,7 +3,8 @@ package domain
 import "testing"
 
 func TestSDKPayload(t *testing.T) {
-	if string(SDKPayload) == "" {
-		t.Fatalf("SDK payload must not be empty")
+	expected := "GO-SDK-v" + SDKVersion
+	if string(SDKPayload) != expected {
+		t.Fatalf("SDK payload mismatch: got %q want %q", string(SDKPayload), expected)
 	}
 }
