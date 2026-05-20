@@ -628,7 +628,7 @@ func MustParseCreateTokenSeriesResult(resultHex string) uint32 {
 // ParseMintNonFungibleResult parses a Carbon NFT mint result into NFT addresses.
 func ParseMintNonFungibleResult(carbonTokenID uint64, resultHex string) ([]Bytes32, error) {
 	return parseCarbonResult(resultHex, func(r *Reader) ([]Bytes32, error) {
-		count := r.ReadLength()
+		count := r.ReadLengthFor(8)
 		out := make([]Bytes32, count)
 		for i := range out {
 			out[i] = GetNFTAddress(carbonTokenID, r.Read8U())
@@ -649,7 +649,7 @@ func MustParseMintNonFungibleResult(carbonTokenID uint64, resultHex string) []By
 // ParseMintPhantasmaNonFungibleResult parses a Phantasma NFT mint result.
 func ParseMintPhantasmaNonFungibleResult(resultHex string) ([]PhantasmaNFTMintResult, error) {
 	return parseCarbonResult(resultHex, func(r *Reader) ([]PhantasmaNFTMintResult, error) {
-		count := r.ReadLength()
+		count := r.ReadLengthFor(40)
 		out := make([]PhantasmaNFTMintResult, count)
 		for i := range out {
 			out[i].ReadCarbon(r)

@@ -611,7 +611,7 @@ func writeBytes16Array(w *Writer, values []Bytes16) {
 }
 
 func readBytes16Array(r *Reader) []Bytes16 {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(16)
 	out := make([]Bytes16, count)
 	for i := range out {
 		out[i] = r.Read16()
@@ -627,7 +627,7 @@ func writeBytes32Array(w *Writer, values []Bytes32) {
 }
 
 func readBytes32Array(r *Reader) []Bytes32 {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(32)
 	out := make([]Bytes32, count)
 	for i := range out {
 		out[i] = r.Read32()
@@ -643,7 +643,7 @@ func writeBytes64Array(w *Writer, values []Bytes64) {
 }
 
 func readBytes64Array(r *Reader) []Bytes64 {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(64)
 	out := make([]Bytes64, count)
 	for i := range out {
 		out[i] = r.Read64()

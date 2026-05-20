@@ -1,6 +1,9 @@
 package carbon
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // TxType identifies a Carbon transaction message type.
 type TxType byte
@@ -159,7 +162,7 @@ func (m *SignedTxMsg) ReadCarbon(r *Reader) {
 			Witness{Address: m.fromAddress(), Signature: r.Read64()},
 		)
 	case TxTypeCall, TxTypeCallMulti, TxTypeTrade, TxTypePhantasma:
-		count := r.ReadLength()
+		count := r.ReadLengthFor(96)
 		for i := 0; i < count; i++ {
 			var witness Witness
 			witness.ReadCarbon(r)
@@ -232,7 +235,14 @@ func (s *MsgCallArgSections) ReadWithCount(r *Reader, countNegative int32) {
 	if countNegative >= 0 {
 		panic("arg sections count must be negative")
 	}
-	count := int(-countNegative)
+	count64 := -int64(countNegative)
+	if count64 > math.MaxInt32 {
+		panic("invalid array length")
+	}
+	count := int(count64)
+	if int64(count)*4 > int64(len(r.data)-r.off) {
+		panic(fmt.Sprintf("array length %d exceeds remaining bytes %d", count, len(r.data)-r.off))
+	}
 	s.Sections = make([]CallArgSection, count)
 	for i := range s.Sections {
 		value := r.Read4()
@@ -298,7 +308,7 @@ func (m *TxMsgCallMulti) WriteCarbon(w *Writer) {
 
 // ReadCarbon reads the multi-call payload from r.
 func (m *TxMsgCallMulti) ReadCarbon(r *Reader) {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(12)
 	m.Calls = make([]TxMsgCall, count)
 	for i := range m.Calls {
 		m.Calls[i].ReadCarbon(r)
@@ -711,7 +721,7 @@ func writeTransferFungibleGasPayerSlice(w *Writer, values []TxMsgTransferFungibl
 }
 
 func readTransferFungibleGasPayerSlice(r *Reader, values *[]TxMsgTransferFungibleGasPayer) {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(80)
 	out := make([]TxMsgTransferFungibleGasPayer, count)
 	for i := range out {
 		out[i].ReadCarbon(r)
@@ -727,7 +737,7 @@ func writeTransferNonFungibleSingleGasPayerSlice(w *Writer, values []TxMsgTransf
 }
 
 func readTransferNonFungibleSingleGasPayerSlice(r *Reader, values *[]TxMsgTransferNonFungibleSingleGasPayer) {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(80)
 	out := make([]TxMsgTransferNonFungibleSingleGasPayer, count)
 	for i := range out {
 		out[i].ReadCarbon(r)
@@ -743,7 +753,7 @@ func writeMintFungibleSlice(w *Writer, values []TxMsgMintFungible) {
 }
 
 func readMintFungibleSlice(r *Reader, values *[]TxMsgMintFungible) {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(49)
 	out := make([]TxMsgMintFungible, count)
 	for i := range out {
 		out[i].ReadCarbon(r)
@@ -759,7 +769,7 @@ func writeBurnFungibleGasPayerSlice(w *Writer, values []TxMsgBurnFungibleGasPaye
 }
 
 func readBurnFungibleGasPayerSlice(r *Reader, values *[]TxMsgBurnFungibleGasPayer) {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(49)
 	out := make([]TxMsgBurnFungibleGasPayer, count)
 	for i := range out {
 		out[i].ReadCarbon(r)
@@ -775,7 +785,7 @@ func writeMintNonFungibleSlice(w *Writer, values []TxMsgMintNonFungible) {
 }
 
 func readMintNonFungibleSlice(r *Reader, values *[]TxMsgMintNonFungible) {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(52)
 	out := make([]TxMsgMintNonFungible, count)
 	for i := range out {
 		out[i].ReadCarbon(r)
@@ -791,7 +801,7 @@ func writeBurnNonFungibleGasPayerSlice(w *Writer, values []TxMsgBurnNonFungibleG
 }
 
 func readBurnNonFungibleGasPayerSlice(r *Reader, values *[]TxMsgBurnNonFungibleGasPayer) {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(48)
 	out := make([]TxMsgBurnNonFungibleGasPayer, count)
 	for i := range out {
 		out[i].ReadCarbon(r)
