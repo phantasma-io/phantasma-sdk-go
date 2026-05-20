@@ -3,6 +3,7 @@ package carbon
 import (
 	"bytes"
 	"encoding/hex"
+	"math"
 	"math/big"
 	"os"
 	"reflect"
@@ -122,6 +123,35 @@ func TestCarbonVectors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReaderRejectsFixedWidthArrayLengthBeforeAllocation(t *testing.T) {
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("expected fixed-width array length to panic")
+		}
+		if !strings.Contains(recovered.(string), "exceeds remaining bytes") {
+			t.Fatalf("unexpected panic: %v", recovered)
+		}
+	}()
+
+	NewReader([]byte{2, 0, 0, 0, 1, 2, 3, 4}).ReadInt32Array()
+}
+
+func TestMsgCallArgSectionsRejectsMinimumNegativeCount(t *testing.T) {
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("expected minimum negative count to panic")
+		}
+		if !strings.Contains(recovered.(string), "invalid array length") {
+			t.Fatalf("unexpected panic: %v", recovered)
+		}
+	}()
+
+	var sections MsgCallArgSections
+	sections.ReadWithCount(NewReader(nil), math.MinInt32)
 }
 
 func TestTx1VectorFields(t *testing.T) {

@@ -305,7 +305,7 @@ func writeNFTMintInfoArray(w *Writer, values []NFTMintInfo) {
 }
 
 func readNFTMintInfoArray(r *Reader) []NFTMintInfo {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(12)
 	out := make([]NFTMintInfo, count)
 	for i := range out {
 		out[i].ReadCarbon(r)
@@ -321,7 +321,7 @@ func writePhantasmaNFTMintInfoArray(w *Writer, values []PhantasmaNFTMintInfo) {
 }
 
 func readPhantasmaNFTMintInfoArray(r *Reader) []PhantasmaNFTMintInfo {
-	count := r.ReadLength()
+	count := r.ReadLengthFor(17)
 	out := make([]PhantasmaNFTMintInfo, count)
 	for i := range out {
 		out[i].ReadCarbon(r)

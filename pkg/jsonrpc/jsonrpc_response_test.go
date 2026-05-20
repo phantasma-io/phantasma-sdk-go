@@ -86,6 +86,19 @@ func TestDecodeRPCResponsePreservesJSONNumberResults(t *testing.T) {
 	require.IsType(t, json.Number(""), response.Result)
 }
 
+func TestDecodeRPCResponseRequiresResultOnSuccess(t *testing.T) {
+	_, err := decodeRPCResponse(newStrictResponseDecoder(`{"jsonrpc":"2.0","id":"1"}`))
+	require.ErrorContains(t, err, "result missing")
+
+	response, err := decodeRPCResponse(newStrictResponseDecoder(`{"jsonrpc":"2.0","id":"1","result":null}`))
+	require.NoError(t, err)
+	require.Nil(t, response.Result)
+
+	response, err = decodeRPCResponse(newStrictResponseDecoder(`{"jsonrpc":"2.0","id":"1","error":{"code":-32603,"message":"failed"}}`))
+	require.NoError(t, err)
+	require.NotNil(t, response.Error)
+}
+
 func TestClientAcceptsMatchingSingleResponseID(t *testing.T) {
 	tests := []struct {
 		name string
@@ -114,6 +127,39 @@ func TestClientAcceptsMatchingSingleResponseID(t *testing.T) {
 			require.Equal(t, 0, response.ID)
 		})
 	}
+}
+
+func TestClientGeneratesDistinctSingleRequestIDsAndRejectsStaleID(t *testing.T) {
+	// Normal Call() usage must advance the request id and reject a stale echo
+	// from the previous call before the caller can consume the result body.
+	var requestIDs []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request RPCRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
+		requestIDs = append(requestIDs, request.ID)
+
+		responseID := request.ID
+		if len(requestIDs) == 2 {
+			responseID = requestIDs[0]
+		}
+
+		w.Header().Set("content-type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      responseID,
+			"result":  true,
+		}))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL)
+	first, err := client.Call(context.Background(), "first")
+	require.NoError(t, err)
+	require.Equal(t, 0, first.ID)
+
+	_, err = client.Call(context.Background(), "second")
+	require.ErrorContains(t, err, "response id mismatch: got 0, expected 1")
+	require.Equal(t, []string{"0", "1"}, requestIDs)
 }
 
 func TestClientRejectsMismatchedSingleResponseID(t *testing.T) {
@@ -171,6 +217,47 @@ func TestClientRejectsStaleDefaultResponseIDWhenRequestUsesDifferentID(t *testin
 	client := NewClientWithOpts(server.URL, &RPCClientOpts{DefaultRequestID: 7})
 	_, err := client.Call(context.Background(), "getBlockHeight", "main")
 	require.ErrorContains(t, err, "response id mismatch: got 0, expected 7")
+}
+
+func TestClientRejectsResponseBodyAboveConfiguredLimit(t *testing.T) {
+	body := `{"jsonrpc":"2.0","id":"0","result":"0123456789ABCDEF"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	client := NewClientWithOpts(server.URL, &RPCClientOpts{MaxResponseBytes: int64(len(body) - 1)})
+	_, err := client.Call(context.Background(), "getBlockHeight", "main")
+	require.ErrorContains(t, err, "response body exceeds")
+}
+
+func TestClientCallBatchAssignsDistinctRequestIDs(t *testing.T) {
+	// CallBatch owns automatic ids for the whole batch, so callers get one
+	// response per generated request id even when responses arrive unordered.
+	var requestIDs []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var requests []RPCRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&requests))
+		require.Len(t, requests, 2)
+		requestIDs = []string{requests[0].ID, requests[1].ID}
+
+		w.Header().Set("content-type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode([]map[string]interface{}{
+			{"jsonrpc": "2.0", "id": requestIDs[1], "result": false},
+			{"jsonrpc": "2.0", "id": requestIDs[0], "result": true},
+		}))
+	}))
+	defer server.Close()
+
+	responses, err := NewClient(server.URL).CallBatch(context.Background(), RPCRequests{
+		NewRequest("first"),
+		NewRequest("second"),
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"0", "1"}, requestIDs)
+	require.Equal(t, true, responses.GetByID(0).Result)
+	require.Equal(t, false, responses.GetByID(1).Result)
 }
 
 func TestClientRejectsUnexpectedBatchResponseID(t *testing.T) {

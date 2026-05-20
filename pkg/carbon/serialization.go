@@ -286,12 +286,22 @@ func (r *Reader) ReadRaw(count int) []byte {
 
 // ReadLength reads a Carbon array length.
 func (r *Reader) ReadLength() int {
+	return r.ReadLengthFor(1)
+}
+
+// ReadLengthFor reads a Carbon array length and verifies that fixed-width
+// elements cannot exceed the remaining input before allocating the slice.
+func (r *Reader) ReadLengthFor(elementSize int) int {
+	if elementSize <= 0 {
+		panic("invalid array element size")
+	}
 	length := r.Read4()
 	if length < 0 {
 		panic("negative array length")
 	}
-	if int64(length) > int64(len(r.data)-r.off) {
-		panic(fmt.Sprintf("array length %d exceeds remaining bytes %d", length, len(r.data)-r.off))
+	remaining := len(r.data) - r.off
+	if int64(length)*int64(elementSize) > int64(remaining) {
+		panic(fmt.Sprintf("array length %d exceeds remaining bytes %d", length, remaining))
 	}
 	return int(length)
 }
@@ -429,7 +439,7 @@ func (r *Reader) ReadByteArray() []byte {
 
 // ReadByteArrays reads a length-prefixed array of byte arrays.
 func (r *Reader) ReadByteArrays() [][]byte {
-	length := r.ReadLength()
+	length := r.ReadLengthFor(4)
 	out := make([][]byte, length)
 	for i := range out {
 		out[i] = r.ReadByteArray()
@@ -449,7 +459,7 @@ func (r *Reader) ReadInt8Array() []int8 {
 
 // ReadInt16Array reads a length-prefixed little-endian int16 array.
 func (r *Reader) ReadInt16Array() []int16 {
-	length := r.ReadLength()
+	length := r.ReadLengthFor(2)
 	out := make([]int16, length)
 	for i := range out {
 		out[i] = r.Read2()
@@ -459,7 +469,7 @@ func (r *Reader) ReadInt16Array() []int16 {
 
 // ReadInt32Array reads a length-prefixed little-endian int32 array.
 func (r *Reader) ReadInt32Array() []int32 {
-	length := r.ReadLength()
+	length := r.ReadLengthFor(4)
 	out := make([]int32, length)
 	for i := range out {
 		out[i] = r.Read4()
@@ -469,7 +479,7 @@ func (r *Reader) ReadInt32Array() []int32 {
 
 // ReadInt64Array reads a length-prefixed little-endian int64 array.
 func (r *Reader) ReadInt64Array() []int64 {
-	length := r.ReadLength()
+	length := r.ReadLengthFor(8)
 	out := make([]int64, length)
 	for i := range out {
 		out[i] = r.Read8()
@@ -479,7 +489,7 @@ func (r *Reader) ReadInt64Array() []int64 {
 
 // ReadUint64Array reads a length-prefixed little-endian uint64 array.
 func (r *Reader) ReadUint64Array() []uint64 {
-	length := r.ReadLength()
+	length := r.ReadLengthFor(8)
 	out := make([]uint64, length)
 	for i := range out {
 		out[i] = r.Read8U()
