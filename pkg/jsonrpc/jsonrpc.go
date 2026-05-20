@@ -31,6 +31,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -38,7 +39,8 @@ import (
 )
 
 const (
-	jsonrpcVersion = "2.0"
+	jsonrpcVersion          = "2.0"
+	DefaultMaxResponseBytes = 16 * 1024 * 1024
 )
 
 // RPCClient sends JSON-RPC requests over HTTP to the provided JSON-RPC backend.
@@ -105,7 +107,7 @@ type RPCClient interface {
 	// - field Params is sent as provided, so Params: 2 forms an invalid json (correct would be Params: []int{2})
 	// - you can use the helper function Params(1, 2, 3) to use the same format as in Call()
 	// - field JSONRPC is overwritten and set to value: "2.0"
-	// - field ID is overwritten and set incrementally and maps to the array position (e.g. requests[5].ID == 5)
+	// - field ID is overwritten from the client's request-id counter; use the returned ids, not array positions
 	//
 	//
 	// Returns RPCResponses that is of type []*RPCResponse
@@ -219,10 +221,21 @@ func (id *rpcResponseID) UnmarshalJSON(data []byte) error {
 }
 
 type rpcResponseWire struct {
-	JSONRPC string         `json:"jsonrpc"`
-	Result  interface{}    `json:"result,omitempty"`
-	Error   *RPCError      `json:"error,omitempty"`
-	ID      *rpcResponseID `json:"id"`
+	JSONRPC string            `json:"jsonrpc"`
+	Result  rpcResponseResult `json:"result,omitempty"`
+	Error   *RPCError         `json:"error,omitempty"`
+	ID      *rpcResponseID    `json:"id"`
+}
+
+type rpcResponseResult struct {
+	Present bool
+	Raw     json.RawMessage
+}
+
+func (result *rpcResponseResult) UnmarshalJSON(data []byte) error {
+	result.Present = true
+	result.Raw = append(result.Raw[:0], data...)
+	return nil
 }
 
 func (response *rpcResponseWire) toRPCResponse() (*RPCResponse, error) {
@@ -232,10 +245,22 @@ func (response *rpcResponseWire) toRPCResponse() (*RPCResponse, error) {
 	if response.ID == nil {
 		return nil, errors.New("rpc response id missing")
 	}
+	if response.Error == nil && !response.Result.Present {
+		return nil, errors.New("rpc response result missing")
+	}
+
+	var result interface{}
+	if response.Result.Present {
+		decoder := json.NewDecoder(bytes.NewReader(response.Result.Raw))
+		decoder.UseNumber()
+		if err := decoder.Decode(&result); err != nil {
+			return nil, fmt.Errorf("could not decode rpc response result: %w", err)
+		}
+	}
 
 	return &RPCResponse{
 		JSONRPC: response.JSONRPC,
-		Result:  response.Result,
+		Result:  result,
 		Error:   response.Error,
 		ID:      int(*response.ID),
 	}, nil
@@ -412,6 +437,7 @@ type rpcClient struct {
 	httpClient         *http.Client
 	customHeaders      map[string]string
 	allowUnknownFields bool
+	maxResponseBytes   int64
 	nextRequestID      atomic.Int64
 }
 
@@ -422,11 +448,14 @@ type rpcClient struct {
 // CustomHeaders: provide custom headers, e.g. to set BasicAuth
 //
 // AllowUnknownFields: allows the rpc response to contain fields that are not defined in the rpc response specification.
+//
+// MaxResponseBytes: maximum accepted HTTP response body size. Zero keeps the default 16 MiB limit.
 type RPCClientOpts struct {
 	HTTPClient         *http.Client
 	CustomHeaders      map[string]string
 	AllowUnknownFields bool
 	DefaultRequestID   int
+	MaxResponseBytes   int64
 }
 
 // RPCResponses is of type []*RPCResponse.
@@ -482,9 +511,10 @@ func NewClient(endpoint string) RPCClient {
 // opts: RPCClientOpts is used to provide custom configuration.
 func NewClientWithOpts(endpoint string, opts *RPCClientOpts) RPCClient {
 	rpcClient := &rpcClient{
-		endpoint:      endpoint,
-		httpClient:    &http.Client{},
-		customHeaders: make(map[string]string),
+		endpoint:         endpoint,
+		httpClient:       &http.Client{},
+		customHeaders:    make(map[string]string),
+		maxResponseBytes: DefaultMaxResponseBytes,
 	}
 
 	if opts == nil {
@@ -505,9 +535,32 @@ func NewClientWithOpts(endpoint string, opts *RPCClientOpts) RPCClient {
 		rpcClient.allowUnknownFields = true
 	}
 
+	if opts.MaxResponseBytes > 0 {
+		rpcClient.maxResponseBytes = opts.MaxResponseBytes
+	}
+
 	rpcClient.nextRequestID.Store(int64(opts.DefaultRequestID))
 
 	return rpcClient
+}
+
+func newResponseDecoder(body io.Reader, allowUnknownFields bool, maxResponseBytes int64) (*json.Decoder, error) {
+	if maxResponseBytes <= 0 {
+		maxResponseBytes = DefaultMaxResponseBytes
+	}
+	data, err := io.ReadAll(io.LimitReader(body, maxResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxResponseBytes {
+		return nil, fmt.Errorf("rpc response body exceeds %d bytes", maxResponseBytes)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if !allowUnknownFields {
+		decoder.DisallowUnknownFields()
+	}
+	decoder.UseNumber()
+	return decoder, nil
 }
 
 func (client *rpcClient) nextAutoRequestID() int {
@@ -605,12 +658,11 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 	}
 	defer httpResponse.Body.Close()
 
-	decoder := json.NewDecoder(httpResponse.Body)
-	if !client.allowUnknownFields {
-		decoder.DisallowUnknownFields()
+	decoder, err := newResponseDecoder(httpResponse.Body, client.allowUnknownFields, client.maxResponseBytes)
+	var rpcResponse *RPCResponse
+	if err == nil {
+		rpcResponse, err = decodeRPCResponse(decoder)
 	}
-	decoder.UseNumber()
-	rpcResponse, err := decodeRPCResponse(decoder)
 
 	// parsing error
 	if err != nil {
@@ -667,12 +719,11 @@ func (client *rpcClient) doBatchCall(ctx context.Context, rpcRequest []*RPCReque
 	}
 	defer httpResponse.Body.Close()
 
-	decoder := json.NewDecoder(httpResponse.Body)
-	if !client.allowUnknownFields {
-		decoder.DisallowUnknownFields()
+	decoder, err := newResponseDecoder(httpResponse.Body, client.allowUnknownFields, client.maxResponseBytes)
+	var rpcResponses RPCResponses
+	if err == nil {
+		rpcResponses, err = decodeRPCResponses(decoder)
 	}
-	decoder.UseNumber()
-	rpcResponses, err := decodeRPCResponses(decoder)
 
 	// parsing error
 	if err != nil {

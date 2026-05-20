@@ -86,6 +86,19 @@ func TestDecodeRPCResponsePreservesJSONNumberResults(t *testing.T) {
 	require.IsType(t, json.Number(""), response.Result)
 }
 
+func TestDecodeRPCResponseRequiresResultOnSuccess(t *testing.T) {
+	_, err := decodeRPCResponse(newStrictResponseDecoder(`{"jsonrpc":"2.0","id":"1"}`))
+	require.ErrorContains(t, err, "result missing")
+
+	response, err := decodeRPCResponse(newStrictResponseDecoder(`{"jsonrpc":"2.0","id":"1","result":null}`))
+	require.NoError(t, err)
+	require.Nil(t, response.Result)
+
+	response, err = decodeRPCResponse(newStrictResponseDecoder(`{"jsonrpc":"2.0","id":"1","error":{"code":-32603,"message":"failed"}}`))
+	require.NoError(t, err)
+	require.NotNil(t, response.Error)
+}
+
 func TestClientAcceptsMatchingSingleResponseID(t *testing.T) {
 	tests := []struct {
 		name string
@@ -204,6 +217,19 @@ func TestClientRejectsStaleDefaultResponseIDWhenRequestUsesDifferentID(t *testin
 	client := NewClientWithOpts(server.URL, &RPCClientOpts{DefaultRequestID: 7})
 	_, err := client.Call(context.Background(), "getBlockHeight", "main")
 	require.ErrorContains(t, err, "response id mismatch: got 0, expected 7")
+}
+
+func TestClientRejectsResponseBodyAboveConfiguredLimit(t *testing.T) {
+	body := `{"jsonrpc":"2.0","id":"0","result":"0123456789ABCDEF"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	client := NewClientWithOpts(server.URL, &RPCClientOpts{MaxResponseBytes: int64(len(body) - 1)})
+	_, err := client.Call(context.Background(), "getBlockHeight", "main")
+	require.ErrorContains(t, err, "response body exceeds")
 }
 
 func TestClientCallBatchAssignsDistinctRequestIDs(t *testing.T) {
