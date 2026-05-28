@@ -292,31 +292,41 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			name:     "GetOrganization",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetOrganization(context.Background(), "org-id", true)
+				_, err := client.GetOrganization(context.Background(), "masters", true)
 				return err
 			},
 			method: "getOrganization",
-			params: []interface{}{"org-id", true},
-		},
-		{
-			name:     "GetOrganizationByName",
-			response: objectResult,
-			call: func(client PhantasmaRPC) error {
-				_, err := client.GetOrganizationByName(context.Background(), "validators", true)
-				return err
-			},
-			method: "getOrganizationByName",
-			params: []interface{}{"validators", true},
+			params: []interface{}{"masters", true},
 		},
 		{
 			name:     "GetOrganizations",
-			response: arrayResult,
+			response: cursorResult,
 			call: func(client PhantasmaRPC) error {
-				_, err := client.GetOrganizations(context.Background(), true)
+				_, err := client.GetOrganizations(context.Background(), 2, "cursor", true)
 				return err
 			},
 			method: "getOrganizations",
-			params: []interface{}{true},
+			params: []interface{}{2, "cursor", true},
+		},
+		{
+			name:     "GetOrganizationMembers",
+			response: cursorResult,
+			call: func(client PhantasmaRPC) error {
+				_, err := client.GetOrganizationMembers(context.Background(), "masters", 2, "cursor", false)
+				return err
+			},
+			method: "getOrganizationMembers",
+			params: []interface{}{"masters", 2, "cursor", false},
+		},
+		{
+			name:     "GetOrganizationMember",
+			response: objectResult,
+			call: func(client PhantasmaRPC) error {
+				_, err := client.GetOrganizationMember(context.Background(), "masters", "Pmember", true, AddressTypePhantasma)
+				return err
+			},
+			method: "getOrganizationMember",
+			params: []interface{}{"masters", "Pmember", true, AddressTypePhantasma},
 		},
 		{
 			name:     "GetLeaderboard",
@@ -643,6 +653,12 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 	}
 }
 
+func TestAddressTypeMarshalJSONUsesRPCEnumNames(t *testing.T) {
+	payload, err := AddressTypeCarbon.MarshalJSON()
+	require.NoError(t, err)
+	require.Equal(t, []byte(`"Carbon"`), payload)
+}
+
 func TestCarbonResponseFieldsDecode(t *testing.T) {
 	result := &jsonrpc.RPCResponse{Result: map[string]interface{}{
 		"symbol":   "ART",
@@ -685,6 +701,40 @@ func TestCarbonResponseFieldsDecode(t *testing.T) {
 	require.Equal(t, "100", token.Series[0].MaxMint)
 	require.Equal(t, "7", token.Series[0].MintCount)
 	require.Equal(t, "series", token.Series[0].Metadata[0].Key)
+}
+
+func TestOrganizationResponseFieldsDecode(t *testing.T) {
+	memberCount := "2"
+	orgOwner := "Powner"
+	carbonOwner := "0xowner"
+	orgResult := &jsonrpc.RPCResponse{Result: map[string]interface{}{
+		"name":        "masters",
+		"owner":       orgOwner,
+		"carbonOwner": carbonOwner,
+		"memberCount": memberCount,
+		"metadata": []interface{}{map[string]interface{}{
+			"key":   "role",
+			"value": "validators",
+		}},
+	}}
+	var organization resp.OrganizationResult
+	require.NoError(t, orgResult.GetObject(&organization))
+	require.Equal(t, orgOwner, *organization.Owner)
+	require.Equal(t, carbonOwner, *organization.CarbonOwner)
+	require.Equal(t, memberCount, *organization.MemberCount)
+	require.Equal(t, "role", organization.Metadata[0].Key)
+
+	memberTime := uint64(123)
+	memberResult := &jsonrpc.RPCResponse{Result: map[string]interface{}{
+		"address":       "Pmember",
+		"carbonAddress": "0xmember",
+		"isMember":      true,
+		"memberTime":    memberTime,
+	}}
+	var member resp.OrganizationMemberResult
+	require.NoError(t, memberResult.GetObject(&member))
+	require.True(t, member.IsMember)
+	require.Equal(t, memberTime, *member.MemberTime)
 }
 
 func TestRPCMethodsReturnTransportErrorWithoutPanic(t *testing.T) {

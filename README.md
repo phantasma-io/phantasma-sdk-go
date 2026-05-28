@@ -127,7 +127,7 @@ Carbon `Build...` helpers return validation errors for user input; `MustBuild...
 The RPC client now exposes the Carbon endpoints used by the current C#/TS SDKs. Important additions include:
 
 - chain/block lookup: `GetChains`, `GetChain`, `GetNexus`, `GetBlockByHash`, `GetLatestBlock`, `GetTransactionByBlockHashAndIndex`;
-- contract/organization lookup: `GetContracts`, `GetContractByName`, `GetContractByAddress`, `GetOrganization`, `GetOrganizationByName`, `GetOrganizations`;
+- contract/organization lookup: `GetContracts`, `GetContractByName`, `GetContractByAddress`, `GetOrganization`, `GetOrganizations`, `GetOrganizationMembers`, `GetOrganizationMember`;
 - Carbon token views: `GetTokensByOwner`, `GetTokenWithID`, `GetTokenSeries`, `GetTokenSeriesByID`, `GetTokenNFTs`, `GetAccountFungibleTokens`, `GetAccountNFTs`, `GetAccountOwnedTokens`, `GetAccountOwnedTokenSeries`;
 - archive and auction helpers: `GetArchive`, `ReadArchive`, `WriteArchive`, `GetAuctionsCount`, `GetAuctions`, `GetAuction`;
 - transaction broadcast: `SendCarbonTransaction`, `SignAndSendCarbonTransaction`.
