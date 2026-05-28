@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -32,6 +33,27 @@ const (
 	// AddressTypeCarbon treats account text as a Carbon address.
 	AddressTypeCarbon
 )
+
+func (addressType AddressType) String() string {
+	switch addressType {
+	case AddressTypePhantasma:
+		return "Phantasma"
+	case AddressTypeCarbon:
+		return "Carbon"
+	default:
+		return strconv.Itoa(int(addressType))
+	}
+}
+
+// MarshalJSON emits the enum names expected by Carbon RPC address-type parameters.
+func (addressType AddressType) MarshalJSON() ([]byte, error) {
+	switch addressType {
+	case AddressTypePhantasma, AddressTypeCarbon:
+		return json.Marshal(addressType.String())
+	default:
+		return nil, fmt.Errorf("invalid address type %d", addressType)
+	}
+}
 
 // NewRPCMainnet returns an RPC client for the public mainnet endpoint.
 func NewRPCMainnet() PhantasmaRPC {
@@ -432,31 +454,40 @@ func (rpc PhantasmaRPC) GetContractByAddress(ctx context.Context, chainAddressOr
 	return contract, nil
 }
 
-// GetOrganization returns organization metadata by id.
-func (rpc PhantasmaRPC) GetOrganization(ctx context.Context, id string, extended bool) (resp.OrganizationResult, error) {
+// GetOrganization returns organization metadata by registered name.
+func (rpc PhantasmaRPC) GetOrganization(ctx context.Context, name string, includeMemberCount bool) (resp.OrganizationResult, error) {
 	var organization resp.OrganizationResult
-	if err := rpc.callObject(ctx, &organization, "getOrganization", id, extended); err != nil {
+	if err := rpc.callObject(ctx, &organization, "getOrganization", name, includeMemberCount); err != nil {
 		return resp.OrganizationResult{}, err
 	}
 	return organization, nil
 }
 
-// GetOrganizationByName returns organization metadata by registered name.
-func (rpc PhantasmaRPC) GetOrganizationByName(ctx context.Context, name string, extended bool) (resp.OrganizationResult, error) {
-	var organization resp.OrganizationResult
-	if err := rpc.callObject(ctx, &organization, "getOrganizationByName", name, extended); err != nil {
-		return resp.OrganizationResult{}, err
-	}
-	return organization, nil
-}
-
-// GetOrganizations returns all organizations.
-func (rpc PhantasmaRPC) GetOrganizations(ctx context.Context, extended bool) ([]resp.OrganizationResult, error) {
-	var organizations []resp.OrganizationResult
-	if err := rpc.callObject(ctx, &organizations, "getOrganizations", extended); err != nil {
-		return []resp.OrganizationResult{}, err
+// GetOrganizations returns organizations with cursor pagination.
+func (rpc PhantasmaRPC) GetOrganizations(ctx context.Context, pageSize int, cursor string, includeMemberCount bool) (resp.CursorPaginatedResult[[]resp.OrganizationResult], error) {
+	var organizations resp.CursorPaginatedResult[[]resp.OrganizationResult]
+	if err := rpc.callObject(ctx, &organizations, "getOrganizations", pageSize, cursor, includeMemberCount); err != nil {
+		return resp.CursorPaginatedResult[[]resp.OrganizationResult]{}, err
 	}
 	return organizations, nil
+}
+
+// GetOrganizationMembers returns organization members by registered name.
+func (rpc PhantasmaRPC) GetOrganizationMembers(ctx context.Context, name string, pageSize int, cursor string, includeMemberTime bool) (resp.CursorPaginatedResult[[]resp.OrganizationMemberResult], error) {
+	var members resp.CursorPaginatedResult[[]resp.OrganizationMemberResult]
+	if err := rpc.callObject(ctx, &members, "getOrganizationMembers", name, pageSize, cursor, includeMemberTime); err != nil {
+		return resp.CursorPaginatedResult[[]resp.OrganizationMemberResult]{}, err
+	}
+	return members, nil
+}
+
+// GetOrganizationMember returns one organization membership by registered name.
+func (rpc PhantasmaRPC) GetOrganizationMember(ctx context.Context, name string, address string, checkAddressReservedByte bool, addressType AddressType) (resp.OrganizationMemberResult, error) {
+	var member resp.OrganizationMemberResult
+	if err := rpc.callObject(ctx, &member, "getOrganizationMember", name, address, checkAddressReservedByte, addressType); err != nil {
+		return resp.OrganizationMemberResult{}, err
+	}
+	return member, nil
 }
 
 // GetLeaderboard returns leaderboard rows by name.

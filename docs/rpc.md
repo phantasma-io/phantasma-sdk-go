@@ -39,7 +39,7 @@ The wrapper also includes the Carbon endpoints exposed by the current C#/TS SDKs
 - `GetBlockTransactionCountByHash`, `GetBlockTransactionCountByHashOnChain`
 - `GetTransactionByBlockHashAndIndex`, `GetTransactionByBlockHashAndIndexOnChain`
 - `GetContracts`, `GetContractByName`, `GetContractByAddress`
-- `GetOrganization`, `GetOrganizationByName`, `GetOrganizations`
+- `GetOrganization`, `GetOrganizations`, `GetOrganizationMembers`, `GetOrganizationMember`
 - `GetLeaderboard`
 - `GetTokensByOwner`, `GetTokensByOwnerWithAddressType`, `GetTokenWithID`
 - `GetTokenData`, `GetTokenBalance`, `GetTokenBalanceChecked`, `GetTokenBalanceWithAddressType`
@@ -53,6 +53,7 @@ The wrapper also includes the Carbon endpoints exposed by the current C#/TS SDKs
 - `SendCarbonTransaction`, `SignAndSendCarbonTransaction`
 - `SignAndSendTransaction`, `SignAndSendTransactionWithExpiration`
 
+Organization methods are name-first and pass the registered organization name directly to RPC; numeric Carbon organization IDs are internal node storage details, not public SDK parameters.
 Cursor-paginated methods return `response.CursorPaginatedResult[T]`. Page-paginated methods return `response.PaginatedResult[T]`.
 Carbon token/series id filters are numeric (`uint64` for token ids, `uint32` for Carbon series ids). Pass `0` when the RPC endpoint should use its default/no-filter behavior. `GetTokenNFTsWithSeriesID` also accepts a Phantasma Series ID string filter.
 `GetAccounts` accepts `ctx` followed by variadic addresses and `GetNFTs` accepts `ctx` followed by slices, then joins them for the wire call. Use `GetAccountsText` or `GetNFTsText` only when you already have the comma-separated RPC string. `WriteArchive` accepts raw bytes; use `WriteArchiveBase64` only when the block is already encoded.

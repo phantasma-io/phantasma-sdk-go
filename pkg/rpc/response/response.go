@@ -76,11 +76,21 @@ type GovernanceResult struct {
 	Value string `json:"value"`
 }
 
-// OrganizationResult describes an organization and its members.
+// OrganizationResult describes organization metadata.
 type OrganizationResult struct {
-	ID      *string  `json:"id,omitempty"`
-	Name    *string  `json:"name,omitempty"`
-	Members []string `json:"members,omitempty"`
+	Name        *string               `json:"name,omitempty"`
+	Owner       *string               `json:"owner,omitempty"`
+	CarbonOwner *string               `json:"carbonOwner,omitempty"`
+	Metadata    []TokenPropertyResult `json:"metadata,omitempty"`
+	MemberCount *string               `json:"memberCount,omitempty"`
+}
+
+// OrganizationMemberResult describes one organization membership lookup row.
+type OrganizationMemberResult struct {
+	Address       *string `json:"address,omitempty"`
+	CarbonAddress *string `json:"carbonAddress,omitempty"`
+	IsMember      bool    `json:"isMember"`
+	MemberTime    *uint64 `json:"memberTime,omitempty"`
 }
 
 // CrowdsaleResult describes a crowdsale contract state.
