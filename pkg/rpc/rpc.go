@@ -19,6 +19,9 @@ import (
 	resp "github.com/phantasma-io/phantasma-sdk-go/pkg/rpc/response"
 )
 
+// ApiKeyHeader is the HTTP header carrying the API key on each request.
+const ApiKeyHeader = "X-Api-Key"
+
 // PhantasmaRPC is a JSON-RPC client for Phantasma node endpoints.
 type PhantasmaRPC struct {
 	client jsonrpc.RPCClient
@@ -78,6 +81,18 @@ func NewRPC(endpoint string) PhantasmaRPC {
 		client: jsonrpc.NewClient(endpoint),
 	}
 	return rpc
+}
+
+// NewRPCWithApiKey returns an RPC client for endpoint that sends apiKey in the X-Api-Key header on
+// every request. An empty apiKey behaves like NewRPC.
+func NewRPCWithApiKey(endpoint, apiKey string) PhantasmaRPC {
+	opts := &jsonrpc.RPCClientOpts{}
+	if apiKey != "" {
+		opts.CustomHeaders = map[string]string{ApiKeyHeader: apiKey}
+	}
+	return PhantasmaRPC{
+		client: jsonrpc.NewClientWithOpts(endpoint, opts),
+	}
 }
 
 // Call performs a low-level JSON-RPC call with caller-supplied context.
