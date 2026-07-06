@@ -433,6 +433,18 @@ func (rpc PhantasmaRPC) GetChain(ctx context.Context, name string, extended bool
 	return chain, nil
 }
 
+// GetGasConfig returns the current on-chain gas configuration plus the chain parameters fee
+// estimation needs (block rate target, expiry window). It changes only via governance
+// resolutions, so the result is safe to cache. Feed GasConfigResult.ToGasConfig into
+// carbon.EstimateNativeFee for Tier-1 fee estimates.
+func (rpc PhantasmaRPC) GetGasConfig(ctx context.Context) (resp.GasConfigResult, error) {
+	var gasConfig resp.GasConfigResult
+	if err := rpc.callObject(ctx, &gasConfig, "getGasConfig"); err != nil {
+		return resp.GasConfigResult{}, err
+	}
+	return gasConfig, nil
+}
+
 // GetNexus returns nexus metadata.
 func (rpc PhantasmaRPC) GetNexus(ctx context.Context, extended bool) (resp.NexusResult, error) {
 	var nexus resp.NexusResult

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"strconv"
 	"strings"
 
 	chain "github.com/phantasma-io/phantasma-sdk-go/pkg/blockchain"
+	"github.com/phantasma-io/phantasma-sdk-go/pkg/carbon"
 	"github.com/phantasma-io/phantasma-sdk-go/pkg/io"
 	"github.com/phantasma-io/phantasma-sdk-go/pkg/util"
 	"github.com/phantasma-io/phantasma-sdk-go/pkg/vm"
@@ -231,6 +233,130 @@ type ChainResult struct {
 	Organization *string  `json:"organization,omitempty"`
 	Contracts    []string `json:"contracts,omitempty"`
 	Dapps        []string `json:"dapps,omitempty"`
+}
+
+// GasConfigResult is the getGasConfig response: the current on-chain gas configuration plus the
+// chain parameters fee estimation needs. 64-bit config values arrive as decimal strings (they
+// can exceed the 2^53 precision of JSON numbers in JavaScript-facing tooling).
+type GasConfigResult struct {
+	// GasModelVersion is 1 for the original fee model, 2 for gas-model-v2 (config version >= 1).
+	GasModelVersion uint32 `json:"gasModelVersion"`
+	// GasConfig is the current on-chain config.
+	GasConfig *GasConfigDataResult `json:"gasConfig,omitempty"`
+	// BlockRateTarget is the chain block rate target in milliseconds.
+	BlockRateTarget uint32 `json:"blockRateTarget"`
+	// ExpiryWindow is the transaction expiry window in milliseconds.
+	ExpiryWindow uint32 `json:"expiryWindow"`
+	// UnitsPerBlockDataByte is the gas-model-v2 price of block-carried bytes in gas units per
+	// byte; nil under gas model v1.
+	UnitsPerBlockDataByte *uint32 `json:"unitsPerBlockDataByte,omitempty"`
+}
+
+// GasConfigDataResult is the JSON shape of the on-chain GasConfig. Fields after
+// GasBurnRatioShift exist only when the config version is >= 1 (gas-model-v2) and are omitted
+// from v1 responses.
+type GasConfigDataResult struct {
+	Version                 byte    `json:"version"`
+	MaxNameLength           byte    `json:"maxNameLength"`
+	MaxTokenSymbolLength    byte    `json:"maxTokenSymbolLength"`
+	FeeShift                byte    `json:"feeShift"`
+	MaxStructureSize        uint32  `json:"maxStructureSize"`
+	FeeMultiplier           *string `json:"feeMultiplier,omitempty"`
+	GasTokenID              *string `json:"gasTokenId,omitempty"`
+	DataTokenID             *string `json:"dataTokenId,omitempty"`
+	MinimumGasOffer         *string `json:"minimumGasOffer,omitempty"`
+	DataEscrowPerRow        *string `json:"dataEscrowPerRow,omitempty"`
+	GasFeeTransfer          *string `json:"gasFeeTransfer,omitempty"`
+	GasFeeQuery             *string `json:"gasFeeQuery,omitempty"`
+	GasFeeCreateTokenBase   *string `json:"gasFeeCreateTokenBase,omitempty"`
+	GasFeeCreateTokenSymbol *string `json:"gasFeeCreateTokenSymbol,omitempty"`
+	GasFeeCreateTokenSeries *string `json:"gasFeeCreateTokenSeries,omitempty"`
+	GasFeePerByte           *string `json:"gasFeePerByte,omitempty"`
+	GasFeeRegisterName      *string `json:"gasFeeRegisterName,omitempty"`
+	GasBurnRatioMul         *string `json:"gasBurnRatioMul,omitempty"`
+	GasBurnRatioShift       byte    `json:"gasBurnRatioShift"`
+
+	MinimumGasBill             *string `json:"minimumGasBill,omitempty"`
+	GasProducerRatioMul        *string `json:"gasProducerRatioMul,omitempty"`
+	GasProducerRatioShift      *byte   `json:"gasProducerRatioShift,omitempty"`
+	GasDappRatioMul            *string `json:"gasDappRatioMul,omitempty"`
+	GasDappRatioShift          *byte   `json:"gasDappRatioShift,omitempty"`
+	PolicyFeeCreateTokenBase   *string `json:"policyFeeCreateTokenBase,omitempty"`
+	PolicyFeeCreateTokenSymbol *string `json:"policyFeeCreateTokenSymbol,omitempty"`
+	PolicyFeeCreateTokenSeries *string `json:"policyFeeCreateTokenSeries,omitempty"`
+	PolicyFeeRegisterName      *string `json:"policyFeeRegisterName,omitempty"`
+	LegacyDataEscrowPerRow     *string `json:"legacyDataEscrowPerRow,omitempty"`
+}
+
+// ToGasConfig converts the getGasConfig JSON response to the wire-format carbon.GasConfig
+// consumed by the Tier-1 fee estimator (carbon.EstimateNativeFee). It fails on malformed
+// numeric strings and on a v2 response missing tail fields: estimating fees from silently
+// zeroed v2 prices would produce rejected transactions.
+func (g *GasConfigResult) ToGasConfig() (carbon.GasConfig, error) {
+	if g.GasConfig == nil {
+		return carbon.GasConfig{}, fmt.Errorf("getGasConfig response has no gasConfig section")
+	}
+	c := g.GasConfig
+	var config carbon.GasConfig
+	var err error
+	parse := func(value *string, fieldName string) uint64 {
+		if err != nil {
+			return 0
+		}
+		if value == nil || *value == "" {
+			err = fmt.Errorf("getGasConfig field %s is missing or empty", fieldName)
+			return 0
+		}
+		v, parseErr := strconv.ParseUint(*value, 10, 64)
+		if parseErr != nil {
+			err = fmt.Errorf("getGasConfig field %s: %w", fieldName, parseErr)
+			return 0
+		}
+		return v
+	}
+	config.Version = c.Version
+	config.MaxNameLength = c.MaxNameLength
+	config.MaxTokenSymbolLength = c.MaxTokenSymbolLength
+	config.FeeShift = c.FeeShift
+	config.MaxStructureSize = c.MaxStructureSize
+	config.FeeMultiplier = parse(c.FeeMultiplier, "feeMultiplier")
+	config.GasTokenID = parse(c.GasTokenID, "gasTokenId")
+	config.DataTokenID = parse(c.DataTokenID, "dataTokenId")
+	config.MinimumGasOffer = parse(c.MinimumGasOffer, "minimumGasOffer")
+	config.DataEscrowPerRow = parse(c.DataEscrowPerRow, "dataEscrowPerRow")
+	config.GasFeeTransfer = parse(c.GasFeeTransfer, "gasFeeTransfer")
+	config.GasFeeQuery = parse(c.GasFeeQuery, "gasFeeQuery")
+	config.GasFeeCreateTokenBase = parse(c.GasFeeCreateTokenBase, "gasFeeCreateTokenBase")
+	config.GasFeeCreateTokenSymbol = parse(c.GasFeeCreateTokenSymbol, "gasFeeCreateTokenSymbol")
+	config.GasFeeCreateTokenSeries = parse(c.GasFeeCreateTokenSeries, "gasFeeCreateTokenSeries")
+	config.GasFeePerByte = parse(c.GasFeePerByte, "gasFeePerByte")
+	config.GasFeeRegisterName = parse(c.GasFeeRegisterName, "gasFeeRegisterName")
+	config.GasBurnRatioMul = parse(c.GasBurnRatioMul, "gasBurnRatioMul")
+	config.GasBurnRatioShift = c.GasBurnRatioShift
+	if config.Version >= 1 {
+		config.MinimumGasBill = parse(c.MinimumGasBill, "minimumGasBill")
+		config.GasProducerRatioMul = parse(c.GasProducerRatioMul, "gasProducerRatioMul")
+		config.GasDappRatioMul = parse(c.GasDappRatioMul, "gasDappRatioMul")
+		config.PolicyFeeCreateTokenBase = parse(c.PolicyFeeCreateTokenBase, "policyFeeCreateTokenBase")
+		config.PolicyFeeCreateTokenSymbol = parse(c.PolicyFeeCreateTokenSymbol, "policyFeeCreateTokenSymbol")
+		config.PolicyFeeCreateTokenSeries = parse(c.PolicyFeeCreateTokenSeries, "policyFeeCreateTokenSeries")
+		config.PolicyFeeRegisterName = parse(c.PolicyFeeRegisterName, "policyFeeRegisterName")
+		config.LegacyDataEscrowPerRow = parse(c.LegacyDataEscrowPerRow, "legacyDataEscrowPerRow")
+		if err == nil && c.GasProducerRatioShift == nil {
+			err = fmt.Errorf("getGasConfig field gasProducerRatioShift is missing")
+		}
+		if err == nil && c.GasDappRatioShift == nil {
+			err = fmt.Errorf("getGasConfig field gasDappRatioShift is missing")
+		}
+		if err == nil {
+			config.GasProducerRatioShift = *c.GasProducerRatioShift
+			config.GasDappRatioShift = *c.GasDappRatioShift
+		}
+	}
+	if err != nil {
+		return carbon.GasConfig{}, err
+	}
+	return config, nil
 }
 
 // EventResult describes one event emitted by a transaction or script invocation.
