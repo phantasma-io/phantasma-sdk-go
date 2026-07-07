@@ -235,6 +235,72 @@ type ChainResult struct {
 	Dapps        []string `json:"dapps,omitempty"`
 }
 
+// EstimateTransactionResult is the estimateTransaction response: the exact fee bill of one
+// serialized transaction envelope, computed by dry-running it against current chain state
+// (gas-model-v2 Tier-2). 64-bit amounts arrive as decimal strings (they can exceed the 2^53
+// precision of JSON numbers in JavaScript-facing tooling). Amounts are kcal-base atoms of the gas
+// token; escrow amounts are data-token atoms. Service availability (routing, gas model, node
+// budget) surfaces as a standard RPC error, never through this shape.
+type EstimateTransactionResult struct {
+	// WouldAbort is true when the transaction would not complete on-chain as submitted; see
+	// AbortReason.
+	WouldAbort bool `json:"wouldAbort"`
+	// AbortReason holds the rejection or abort reason when WouldAbort is true; empty otherwise.
+	AbortReason string `json:"abortReason,omitempty"`
+	// GasBillKcalBase is the settled gas bill in kcal-base, including the minimum-bill floor and
+	// the maxGas clamp (aborted transactions still pay).
+	GasBillKcalBase *string `json:"gasBillKcalBase,omitempty"`
+	// DataRows is the number of newly paid storage quanta the transaction creates
+	// (DataRows * dataEscrowPerRow == DataEscrowAtoms).
+	DataRows *string `json:"dataRows,omitempty"`
+	// DataEscrowAtoms is the gross storage escrow paid for grown rows, in data-token atoms.
+	DataEscrowAtoms *string `json:"dataEscrowAtoms,omitempty"`
+	// DataRefundAtoms is the gross storage refunds for shrunk rows, in data-token atoms.
+	DataRefundAtoms *string `json:"dataRefundAtoms,omitempty"`
+	// RecommendedMaxGas is the recommended TxMsg maxGas: the bill plus a 15% state-drift margin,
+	// floored at the chain minimums; "0" when WouldAbort.
+	RecommendedMaxGas *string `json:"recommendedMaxGas,omitempty"`
+	// RecommendedMaxData is the recommended TxMsg maxData: the net escrow plus a 15% margin,
+	// aligned up to whole rows; "0" when WouldAbort or nothing is escrowed.
+	RecommendedMaxData *string `json:"recommendedMaxData,omitempty"`
+}
+
+// ToFeeEstimate converts a completed estimate into the same carbon.NativeFeeEstimate the Tier-1
+// estimator produces, so wallet code consumes both tiers identically: MaxGas/MaxData are the
+// recommended ceilings and ExpectedGasBill is the exact settled bill. It returns an error when
+// WouldAbort is set - an aborted simulation has no recommendations (retry with a higher offer or
+// fall back to the Tier-1 estimator) - and on malformed numeric strings.
+func (e *EstimateTransactionResult) ToFeeEstimate() (carbon.NativeFeeEstimate, error) {
+	if e.WouldAbort {
+		return carbon.NativeFeeEstimate{}, fmt.Errorf("estimateTransaction reported the transaction would abort: %s", e.AbortReason)
+	}
+	var err error
+	parse := func(value *string, fieldName string) uint64 {
+		if err != nil {
+			return 0
+		}
+		if value == nil || *value == "" {
+			err = fmt.Errorf("estimateTransaction field %s is missing or empty", fieldName)
+			return 0
+		}
+		v, parseErr := strconv.ParseUint(*value, 10, 64)
+		if parseErr != nil {
+			err = fmt.Errorf("estimateTransaction field %s: %w", fieldName, parseErr)
+			return 0
+		}
+		return v
+	}
+	estimate := carbon.NativeFeeEstimate{
+		MaxGas:          parse(e.RecommendedMaxGas, "recommendedMaxGas"),
+		MaxData:         parse(e.RecommendedMaxData, "recommendedMaxData"),
+		ExpectedGasBill: parse(e.GasBillKcalBase, "gasBillKcalBase"),
+	}
+	if err != nil {
+		return carbon.NativeFeeEstimate{}, err
+	}
+	return estimate, nil
+}
+
 // GasConfigResult is the getGasConfig response: the current on-chain gas configuration plus the
 // chain parameters fee estimation needs. 64-bit config values arrive as decimal strings (they
 // can exceed the 2^53 precision of JSON numbers in JavaScript-facing tooling).

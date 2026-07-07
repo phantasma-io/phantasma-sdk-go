@@ -445,6 +445,20 @@ func (rpc PhantasmaRPC) GetGasConfig(ctx context.Context) (resp.GasConfigResult,
 	return gasConfig, nil
 }
 
+// EstimateTransaction dry-runs a serialized transaction envelope against current chain state and
+// returns its exact fee bill with recommended maxGas/maxData ceilings (gas-model-v2 Tier-2
+// estimate). Signatures inside the envelope may be zero-filled dummies of the correct length -
+// the simulation skips signature checks, and dummies preserve the exact envelope byte length the
+// bill depends on. Until the estimate service is launched this returns a standard RPC error; use
+// carbon.EstimateNativeFee with GetGasConfig as the fallback.
+func (rpc PhantasmaRPC) EstimateTransaction(ctx context.Context, txData string) (resp.EstimateTransactionResult, error) {
+	var estimate resp.EstimateTransactionResult
+	if err := rpc.callObject(ctx, &estimate, "estimateTransaction", txData); err != nil {
+		return resp.EstimateTransactionResult{}, err
+	}
+	return estimate, nil
+}
+
 // GetNexus returns nexus metadata.
 func (rpc PhantasmaRPC) GetNexus(ctx context.Context, extended bool) (resp.NexusResult, error) {
 	var nexus resp.NexusResult
