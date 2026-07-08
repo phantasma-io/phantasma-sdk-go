@@ -546,9 +546,14 @@ type BlockResult struct {
 	Protocol         uint                `json:"protocol"`
 	Txs              []TransactionResult `json:"txs"`
 	ValidatorAddress string              `json:"validatorAddress"`
-	Reward           string              `json:"reward"`
-	Events           []EventResult       `json:"events,omitempty"`
-	Oracles          []OracleResult      `json:"oracles,omitempty"`
+	// ProducerAddress is the fee payout address stamped by the block producer inside the hashed
+	// block input. Non-nil on gas-model-v2 blocks, nil on earlier blocks. Distinct from
+	// ValidatorAddress (the consensus-log leader): usually equal today, but a configurable payout
+	// address is a planned compatible extension, so consumers must not assume equality.
+	ProducerAddress *string        `json:"producerAddress,omitempty"`
+	Reward          string         `json:"reward"`
+	Events          []EventResult  `json:"events,omitempty"`
+	Oracles         []OracleResult `json:"oracles,omitempty"`
 }
 
 // TokenExternalResult describes an external platform mapping for a token.

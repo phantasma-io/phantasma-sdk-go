@@ -129,6 +129,23 @@ func TestRPCDTOsDecodeCurrentResponseShapes(t *testing.T) {
 	if len(block.Txs) != 1 || block.Txs[0].CarbonTxType != 9 {
 		t.Fatalf("nested transaction fields lost: %+v", block.Txs)
 	}
+	// Pre-gas-model-v2 block: the producerAddress key is omitted, so the pointer stays nil.
+	if block.ProducerAddress != nil {
+		t.Fatalf("omitted producerAddress must decode to nil: %+v", block.ProducerAddress)
+	}
+
+	// Gas-model-v2 block: producerAddress is present and decodes verbatim; distinct in meaning
+	// from ValidatorAddress (the consensus-log leader).
+	var v2Block BlockResult
+	if err := json.Unmarshal([]byte(`{"hash":"BLOCK","height":457,"txs":[],"reward":"0","validatorAddress":"Pvalidator","producerAddress":"Pproducer"}`), &v2Block); err != nil {
+		t.Fatalf("v2 block decode failed: %v", err)
+	}
+	if v2Block.ValidatorAddress != "Pvalidator" {
+		t.Fatalf("validatorAddress lost: %+v", v2Block.ValidatorAddress)
+	}
+	if v2Block.ProducerAddress == nil || *v2Block.ProducerAddress != "Pproducer" {
+		t.Fatalf("producerAddress not decoded: %+v", v2Block.ProducerAddress)
+	}
 
 	var token TokenResult
 	if err := json.Unmarshal([]byte(`{
