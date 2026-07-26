@@ -458,6 +458,7 @@ func (rpc PhantasmaRPC) GetContract(ctx context.Context, name, chainName string)
 }
 
 // GetChains returns available chains.
+// The extended flag is deprecated server-side and slated for removal.
 func (rpc PhantasmaRPC) GetChains(ctx context.Context, extended bool) ([]resp.ChainResult, error) {
 	var chains []resp.ChainResult
 	if err := rpc.callObject(ctx, &chains, "getChains", extended); err != nil {
@@ -511,6 +512,7 @@ func (rpc PhantasmaRPC) GetNexus(ctx context.Context, extended bool) (resp.Nexus
 }
 
 // GetContracts returns contracts deployed on a chain.
+// The extended flag is deprecated server-side and slated for removal.
 func (rpc PhantasmaRPC) GetContracts(ctx context.Context, chainAddressOrName string, extended bool) ([]resp.ContractResult, error) {
 	var contracts []resp.ContractResult
 	if err := rpc.callObject(ctx, &contracts, "getContracts", chainAddressOrName, extended); err != nil {
@@ -694,6 +696,7 @@ func (rpc PhantasmaRPC) GetTransaction(ctx context.Context, txHash string) (resp
 }
 
 // GetTokens returns token definitions known by the connected node.
+// The extended flag is deprecated server-side and slated for removal.
 func (rpc PhantasmaRPC) GetTokens(ctx context.Context, extended bool) ([]resp.TokenResult, error) {
 	var txResult []resp.TokenResult
 	result, err := rpc.client.Call(normalizeContext(ctx), "getTokens", extended)
@@ -781,6 +784,9 @@ func (rpc PhantasmaRPC) GetTokenWithID(ctx context.Context, symbol string, exten
 }
 
 // GetTokenData returns token data for a Phantasma NFT id.
+//
+// Deprecated: the node serves this as a strict subset of getNFT - same response, with property
+// loading forced off - so GetNFT covers it entirely.
 func (rpc PhantasmaRPC) GetTokenData(ctx context.Context, symbol string, tokenID string) (resp.TokenDataResult, error) {
 	var tokenData resp.TokenDataResult
 	if err := rpc.callObject(ctx, &tokenData, "getTokenData", symbol, tokenID); err != nil {
