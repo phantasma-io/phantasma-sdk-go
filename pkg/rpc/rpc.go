@@ -207,11 +207,19 @@ func (rpc PhantasmaRPC) GetPlatforms(ctx context.Context) ([]resp.PlatformResult
 }
 
 // GetAccounts returns account records for one or more addresses.
+//
+// Deprecated: same unbounded-response problem as GetAccount, multiplied by the number of
+// addresses in one call. Use GetAccountInfo together with GetAccountFungibleTokens and
+// GetAccountNFTs.
 func (rpc PhantasmaRPC) GetAccounts(ctx context.Context, addresses ...string) ([]resp.AccountResult, error) {
 	return rpc.GetAccountsText(ctx, strings.Join(addresses, ","))
 }
 
 // GetAccountsText returns account records for a comma-separated address list.
+//
+// Deprecated: same unbounded-response problem as GetAccount, multiplied by the number of
+// addresses in one call. Use GetAccountInfo together with GetAccountFungibleTokens and
+// GetAccountNFTs.
 func (rpc PhantasmaRPC) GetAccountsText(ctx context.Context, addresses string) ([]resp.AccountResult, error) {
 	var accounts []resp.AccountResult
 	result, err := rpc.client.Call(normalizeContext(ctx), "getAccounts", addresses, false)
@@ -229,6 +237,10 @@ func (rpc PhantasmaRPC) GetAccountsText(ctx context.Context, addresses string) (
 }
 
 // GetAccountsWithAddressType returns account records for addresses of the same address type.
+//
+// Deprecated: same unbounded-response problem as GetAccount, multiplied by the number of
+// addresses in one call. Use GetAccountInfo together with GetAccountFungibleTokens and
+// GetAccountNFTs.
 func (rpc PhantasmaRPC) GetAccountsWithAddressType(ctx context.Context, addresses []string, extended bool, checkAddressReservedByte bool, addressType AddressType) ([]resp.AccountResult, error) {
 	var accounts []resp.AccountResult
 	if err := rpc.callObject(ctx, &accounts, "getAccounts", strings.Join(addresses, ","), extended, checkAddressReservedByte, addressType); err != nil {
@@ -276,6 +288,11 @@ func (rpc PhantasmaRPC) GetAccountInfoWithAddressType(ctx context.Context, addre
 }
 
 // GetAccount returns the current state of an account without the full transaction list.
+//
+// Deprecated: the response embeds every NFT id the address owns, so it grows without bound with the
+// size of the account; the node caps each Balances[].Ids list at 10000 entries while
+// Balances[].Amount keeps the true count, meaning the list is silently partial for large holders.
+// Use GetAccountInfo together with GetAccountFungibleTokens and GetAccountNFTs.
 func (rpc PhantasmaRPC) GetAccount(ctx context.Context, address string) (resp.AccountResult, error) {
 	var account resp.AccountResult
 	result, err := rpc.client.Call(normalizeContext(ctx), "getAccount", address, false)
@@ -293,6 +310,9 @@ func (rpc PhantasmaRPC) GetAccount(ctx context.Context, address string) (resp.Ac
 }
 
 // GetAccountWithAddressType returns account state for an address with explicit address interpretation.
+//
+// Deprecated: see GetAccount. Use GetAccountInfo together with GetAccountFungibleTokens and
+// GetAccountNFTs.
 func (rpc PhantasmaRPC) GetAccountWithAddressType(ctx context.Context, address string, extended bool, checkAddressReservedByte bool, addressType AddressType) (resp.AccountResult, error) {
 	var account resp.AccountResult
 	if err := rpc.callObject(ctx, &account, "getAccount", address, extended, checkAddressReservedByte, addressType); err != nil {
