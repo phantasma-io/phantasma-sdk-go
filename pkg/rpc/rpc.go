@@ -253,6 +253,28 @@ func (rpc PhantasmaRPC) LookupName(ctx context.Context, name string) (string, er
 	return address, nil
 }
 
+// GetAccountInfo returns the account name and staking info for an address.
+//
+// Cost is independent of how much the address holds, which makes this the call to use in wallet
+// refresh loops; balances and NFTs are fetched separately through the cursor-paginated account
+// endpoints.
+func (rpc PhantasmaRPC) GetAccountInfo(ctx context.Context, address string) (resp.AccountInfoResult, error) {
+	var account resp.AccountInfoResult
+	if err := rpc.callObject(ctx, &account, "getAccountInfo", address); err != nil {
+		return resp.AccountInfoResult{}, err
+	}
+	return account, nil
+}
+
+// GetAccountInfoWithAddressType returns the account overview with explicit address interpretation.
+func (rpc PhantasmaRPC) GetAccountInfoWithAddressType(ctx context.Context, address string, checkAddressReservedByte bool, addressType AddressType) (resp.AccountInfoResult, error) {
+	var account resp.AccountInfoResult
+	if err := rpc.callObject(ctx, &account, "getAccountInfo", address, checkAddressReservedByte, addressType); err != nil {
+		return resp.AccountInfoResult{}, err
+	}
+	return account, nil
+}
+
 // GetAccount returns the current state of an account without the full transaction list.
 func (rpc PhantasmaRPC) GetAccount(ctx context.Context, address string) (resp.AccountResult, error) {
 	var account resp.AccountResult

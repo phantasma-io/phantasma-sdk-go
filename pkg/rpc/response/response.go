@@ -149,6 +149,21 @@ type StorageResult struct {
 	Archives  []ArchiveResult `json:"archives"`
 }
 
+// AccountInfoResult describes the lightweight account overview returned by getAccountInfo.
+//
+// It carries no balances and no NFT id lists, so fetching it costs the same regardless of how much
+// an address holds - unlike AccountResult, whose Balances[].Ids embed every owned NFT id and are
+// capped server-side at 10000 entries per token. Balances and NFTs are fetched separately through
+// the cursor-paginated account endpoints.
+//
+// Note the JSON name of the staking object differs from AccountResult, which carries the same
+// object under "stakes" and uses "stake" for a deprecated flat scalar.
+type AccountInfoResult struct {
+	Address string      `json:"address"`
+	Name    string      `json:"name"`
+	Stake   StakeResult `json:"stake"`
+}
+
 // AccountResult describes account state returned by account endpoints.
 type AccountResult struct {
 	Address   string          `json:"address"`

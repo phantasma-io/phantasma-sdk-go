@@ -159,6 +159,26 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			params: []interface{}{"Pone,Ptwo", true, true, AddressTypeCarbon},
 		},
 		{
+			name:     "GetAccountInfo",
+			response: objectResult,
+			call: func(client PhantasmaRPC) error {
+				_, err := client.GetAccountInfo(context.Background(), "Paccount")
+				return err
+			},
+			method: "getAccountInfo",
+			params: []interface{}{"Paccount"},
+		},
+		{
+			name:     "GetAccountInfoWithAddressType",
+			response: objectResult,
+			call: func(client PhantasmaRPC) error {
+				_, err := client.GetAccountInfoWithAddressType(context.Background(), "001122", false, AddressTypeCarbon)
+				return err
+			},
+			method: "getAccountInfo",
+			params: []interface{}{"001122", false, AddressTypeCarbon},
+		},
+		{
 			name:     "GetAccountWithAddressType",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
@@ -659,6 +679,31 @@ func TestAddressTypeMarshalJSONUsesRPCEnumNames(t *testing.T) {
 	require.Equal(t, []byte(`"Carbon"`), payload)
 }
 
+// getAccountInfo names the staking object "stake", while getAccount carries the same object under
+// "stakes" and uses "stake" for a deprecated flat scalar. Binding the wrong one would silently yield
+// a zero stake, so the mapping is pinned against the exact wire shape the node returns.
+func TestAccountInfoResponseFieldsDecode(t *testing.T) {
+	result := &jsonrpc.RPCResponse{Result: map[string]interface{}{
+		"address": "P2Kaccount",
+		"name":    "myname",
+		"stake": map[string]interface{}{
+			"amount":    "1500000000000",
+			"time":      1743520000,
+			"unclaimed": "42000000000",
+		},
+	}}
+
+	client := PhantasmaRPC{client: &recordingRPCClient{response: result}}
+
+	account, err := client.GetAccountInfo(context.Background(), "P2Kaccount")
+	require.NoError(t, err)
+	require.Equal(t, "P2Kaccount", account.Address)
+	require.Equal(t, "myname", account.Name)
+	require.Equal(t, "1500000000000", account.Stake.Amount)
+	require.Equal(t, uint(1743520000), account.Stake.Time)
+	require.Equal(t, "42000000000", account.Stake.Unclaimed)
+}
+
 func TestCarbonResponseFieldsDecode(t *testing.T) {
 	result := &jsonrpc.RPCResponse{Result: map[string]interface{}{
 		"symbol":   "ART",
@@ -769,6 +814,13 @@ func TestRPCMethodsReturnTransportErrorWithoutPanic(t *testing.T) {
 			name: "GetAccount",
 			call: func(client PhantasmaRPC) error {
 				_, err := client.GetAccount(context.Background(), "P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP")
+				return err
+			},
+		},
+		{
+			name: "GetAccountInfo",
+			call: func(client PhantasmaRPC) error {
+				_, err := client.GetAccountInfo(context.Background(), "P2KA7yzB3uUncuAqP6tLut27iTKAC6ZTnAVM4myUuG57oQP")
 				return err
 			},
 		},
