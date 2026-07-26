@@ -547,6 +547,7 @@ func (rpc PhantasmaRPC) GetOrganization(ctx context.Context, name string, includ
 }
 
 // GetOrganizations returns organizations with cursor pagination.
+// pageSize must be 1..100; the node rejects anything outside that range.
 func (rpc PhantasmaRPC) GetOrganizations(ctx context.Context, pageSize int, cursor string, includeMemberCount bool) (resp.CursorPaginatedResult[[]resp.OrganizationResult], error) {
 	var organizations resp.CursorPaginatedResult[[]resp.OrganizationResult]
 	if err := rpc.callObject(ctx, &organizations, "getOrganizations", pageSize, cursor, includeMemberCount); err != nil {
@@ -556,6 +557,7 @@ func (rpc PhantasmaRPC) GetOrganizations(ctx context.Context, pageSize int, curs
 }
 
 // GetOrganizationMembers returns organization members by registered name.
+// pageSize must be 1..100; the node rejects anything outside that range.
 func (rpc PhantasmaRPC) GetOrganizationMembers(ctx context.Context, name string, pageSize int, cursor string, includeMemberTime bool) (resp.CursorPaginatedResult[[]resp.OrganizationMemberResult], error) {
 	var members resp.CursorPaginatedResult[[]resp.OrganizationMemberResult]
 	if err := rpc.callObject(ctx, &members, "getOrganizationMembers", name, pageSize, cursor, includeMemberTime); err != nil {
@@ -815,6 +817,7 @@ func (rpc PhantasmaRPC) GetTokenBalanceWithAddressType(ctx context.Context, addr
 }
 
 // GetTokenSeries returns token series with cursor pagination. Use carbonTokenID 0 when no Carbon token id filter is needed.
+// pageSize must be 1..100; the node rejects anything outside that range.
 func (rpc PhantasmaRPC) GetTokenSeries(ctx context.Context, symbol string, carbonTokenID uint64, pageSize int, cursor string) (resp.CursorPaginatedResult[[]resp.TokenSeriesResult], error) {
 	var series resp.CursorPaginatedResult[[]resp.TokenSeriesResult]
 	if err := rpc.callObject(ctx, &series, "getTokenSeries", symbol, carbonTokenID, pageSize, cursor); err != nil {
@@ -833,6 +836,7 @@ func (rpc PhantasmaRPC) GetTokenSeriesByID(ctx context.Context, symbol string, c
 }
 
 // GetTokenNFTs returns NFTs for a Carbon token with cursor pagination.
+// pageSize must be 1..100, or 1..50 when extended is true; the node rejects anything else.
 func (rpc PhantasmaRPC) GetTokenNFTs(ctx context.Context, carbonTokenID uint64, carbonSeriesID uint32, pageSize int, cursor string, extended bool) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
 	return rpc.GetTokenNFTsWithSeriesID(ctx, carbonTokenID, carbonSeriesID, "", pageSize, cursor, extended)
 }
@@ -847,6 +851,7 @@ func (rpc PhantasmaRPC) GetTokenNFTsWithSeriesID(ctx context.Context, carbonToke
 }
 
 // GetAccountFungibleTokens returns fungible balances owned by an account with cursor pagination.
+// pageSize must be 1..100; the node rejects anything outside that range.
 func (rpc PhantasmaRPC) GetAccountFungibleTokens(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.BalanceResult], error) {
 	var balances resp.CursorPaginatedResult[[]resp.BalanceResult]
 	if err := rpc.callObject(ctx, &balances, "getAccountFungibleTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte); err != nil {
@@ -865,6 +870,7 @@ func (rpc PhantasmaRPC) GetAccountFungibleTokensWithAddressType(ctx context.Cont
 }
 
 // GetAccountNFTs returns NFTs owned by an account with cursor pagination.
+// pageSize must be 1..100, or 1..50 when extended is true; the node rejects anything else.
 func (rpc PhantasmaRPC) GetAccountNFTs(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, carbonSeriesID uint32, pageSize int, cursor string, extended bool, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.TokenDataResult], error) {
 	var nfts resp.CursorPaginatedResult[[]resp.TokenDataResult]
 	if err := rpc.callObject(ctx, &nfts, "getAccountNFTs", account, tokenSymbol, carbonTokenID, carbonSeriesID, pageSize, cursor, extended, checkAddressReservedByte); err != nil {
@@ -883,6 +889,7 @@ func (rpc PhantasmaRPC) GetAccountNFTsWithAddressType(ctx context.Context, accou
 }
 
 // GetAccountOwnedTokens returns token definitions owned by an account with cursor pagination.
+// pageSize must be 1..100; the node rejects anything outside that range.
 func (rpc PhantasmaRPC) GetAccountOwnedTokens(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.TokenResult], error) {
 	var tokens resp.CursorPaginatedResult[[]resp.TokenResult]
 	if err := rpc.callObject(ctx, &tokens, "getAccountOwnedTokens", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte); err != nil {
@@ -901,6 +908,7 @@ func (rpc PhantasmaRPC) GetAccountOwnedTokensWithAddressType(ctx context.Context
 }
 
 // GetAccountOwnedTokenSeries returns token series owned by an account with cursor pagination.
+// pageSize must be 1..100; the node rejects anything outside that range.
 func (rpc PhantasmaRPC) GetAccountOwnedTokenSeries(ctx context.Context, account string, tokenSymbol string, carbonTokenID uint64, pageSize int, cursor string, checkAddressReservedByte bool) (resp.CursorPaginatedResult[[]resp.TokenSeriesResult], error) {
 	var series resp.CursorPaginatedResult[[]resp.TokenSeriesResult]
 	if err := rpc.callObject(ctx, &series, "getAccountOwnedTokenSeries", account, tokenSymbol, carbonTokenID, pageSize, cursor, checkAddressReservedByte); err != nil {
