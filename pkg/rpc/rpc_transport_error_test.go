@@ -179,6 +179,28 @@ func TestRPCWrapperParameterParity(t *testing.T) {
 			params: []interface{}{"001122", false, AddressTypeCarbon},
 		},
 		{
+			// The batch endpoint takes a NATIVE JSON array parameter (one element), unlike the
+			// deprecated getAccounts wire, which joined addresses into a comma string.
+			name:     "GetAccountInfos",
+			response: arrayResult,
+			call: func(client PhantasmaRPC) error {
+				_, err := client.GetAccountInfos(context.Background(), []string{"Pone", "Ptwo"})
+				return err
+			},
+			method: "getAccountInfos",
+			params: []interface{}{[]string{"Pone", "Ptwo"}},
+		},
+		{
+			name:     "GetAccountInfosWithAddressType",
+			response: arrayResult,
+			call: func(client PhantasmaRPC) error {
+				_, err := client.GetAccountInfosWithAddressType(context.Background(), []string{"001122"}, false, AddressTypeCarbon)
+				return err
+			},
+			method: "getAccountInfos",
+			params: []interface{}{[]string{"001122"}, false, AddressTypeCarbon},
+		},
+		{
 			name:     "GetAccountWithAddressType",
 			response: objectResult,
 			call: func(client PhantasmaRPC) error {
@@ -702,6 +724,45 @@ func TestAccountInfoResponseFieldsDecode(t *testing.T) {
 	require.Equal(t, "1500000000000", account.Stake.Amount)
 	require.Equal(t, uint(1743520000), account.Stake.Time)
 	require.Equal(t, "42000000000", account.Stake.Unclaimed)
+}
+
+// The batch response decodes per element with the same stake-vs-stakes nuance as getAccountInfo,
+// and the request order must survive the round-trip - distinct values per element make an order or
+// attribution mix-up visible.
+func TestAccountInfosResponseFieldsDecode(t *testing.T) {
+	result := &jsonrpc.RPCResponse{Result: []interface{}{
+		map[string]interface{}{
+			"address": "P2Kaccount1",
+			"name":    "anonymous",
+			"stake": map[string]interface{}{
+				"amount":    "0",
+				"time":      0,
+				"unclaimed": "0",
+			},
+		},
+		map[string]interface{}{
+			"address": "P2Kaccount2",
+			"name":    "myname",
+			"stake": map[string]interface{}{
+				"amount":    "1500000000000",
+				"time":      1743520000,
+				"unclaimed": "42000000000",
+			},
+		},
+	}}
+
+	client := PhantasmaRPC{client: &recordingRPCClient{response: result}}
+
+	accounts, err := client.GetAccountInfos(context.Background(), []string{"P2Kaccount1", "P2Kaccount2"})
+	require.NoError(t, err)
+	require.Len(t, accounts, 2)
+	require.Equal(t, "P2Kaccount1", accounts[0].Address)
+	require.Equal(t, "anonymous", accounts[0].Name)
+	require.Equal(t, "0", accounts[0].Stake.Amount)
+	require.Equal(t, "P2Kaccount2", accounts[1].Address)
+	require.Equal(t, "myname", accounts[1].Name)
+	require.Equal(t, "1500000000000", accounts[1].Stake.Amount)
+	require.Equal(t, "42000000000", accounts[1].Stake.Unclaimed)
 }
 
 func TestCarbonResponseFieldsDecode(t *testing.T) {

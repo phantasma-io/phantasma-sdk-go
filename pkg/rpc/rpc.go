@@ -287,6 +287,28 @@ func (rpc PhantasmaRPC) GetAccountInfoWithAddressType(ctx context.Context, addre
 	return account, nil
 }
 
+// GetAccountInfos returns account overviews for a batch of up to 100 addresses in one call.
+//
+// Batch counterpart of GetAccountInfo with the same per-account record: the node answers every
+// address from a single state snapshot and returns results in request order. The addresses travel
+// as a native JSON array parameter; a malformed address rejects the whole batch.
+func (rpc PhantasmaRPC) GetAccountInfos(ctx context.Context, addresses []string) ([]resp.AccountInfoResult, error) {
+	var accounts []resp.AccountInfoResult
+	if err := rpc.callObject(ctx, &accounts, "getAccountInfos", addresses); err != nil {
+		return []resp.AccountInfoResult{}, err
+	}
+	return accounts, nil
+}
+
+// GetAccountInfosWithAddressType returns the batch account overview with explicit address interpretation.
+func (rpc PhantasmaRPC) GetAccountInfosWithAddressType(ctx context.Context, addresses []string, checkAddressReservedByte bool, addressType AddressType) ([]resp.AccountInfoResult, error) {
+	var accounts []resp.AccountInfoResult
+	if err := rpc.callObject(ctx, &accounts, "getAccountInfos", addresses, checkAddressReservedByte, addressType); err != nil {
+		return []resp.AccountInfoResult{}, err
+	}
+	return accounts, nil
+}
+
 // GetAccount returns the current state of an account without the full transaction list.
 //
 // Deprecated: the response embeds every NFT id the address owns, so it grows without bound with the
