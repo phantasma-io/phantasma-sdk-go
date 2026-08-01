@@ -799,7 +799,7 @@ func TestCarbonResponseFieldsDecode(t *testing.T) {
 	require.Equal(t, "42", token.CarbonID)
 	require.NotNil(t, token.TokenSchemas)
 	require.Equal(t, "name", token.Metadata[0].Key)
-	require.Equal(t, "Carbon Art", token.Metadata[0].Value)
+	require.Equal(t, resp.VMText("Carbon Art"), token.Metadata[0].Value)
 	require.Equal(t, "9", token.Series[0].SeriesID)
 	require.Equal(t, "42", token.Series[0].CarbonTokenID)
 	require.Equal(t, "3", token.Series[0].CarbonSeriesID)

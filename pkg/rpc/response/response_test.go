@@ -164,7 +164,8 @@ func TestRPCDTOsDecodeCurrentResponseShapes(t *testing.T) {
 	}`), &token); err != nil {
 		t.Fatalf("token decode failed: %v", err)
 	}
-	if token.CarbonID != "4" || token.Metadata[0].Key != "name" || token.Metadata[0].Value != "Crown" {
+	tokenName, isScalar := token.Metadata[0].Value.AsText()
+	if token.CarbonID != "4" || token.Metadata[0].Key != "name" || !isScalar || tokenName != "Crown" {
 		t.Fatalf("token fields lost: %+v", token)
 	}
 	if token.Script != nil || token.External != nil || token.Price != nil {
@@ -193,7 +194,8 @@ func TestRPCDTOsDecodeCurrentResponseShapes(t *testing.T) {
 	}`), &nft); err != nil {
 		t.Fatalf("NFT decode failed: %v", err)
 	}
-	if nft.ID != "114421" || nft.Series != "0" || nft.CarbonSeriesID != "1" || nft.Properties[0].Value != "Crown #1" {
+	nftName, isScalar := nft.Properties[0].Value.AsText()
+	if nft.ID != "114421" || nft.Series != "0" || nft.CarbonSeriesID != "1" || !isScalar || nftName != "Crown #1" {
 		t.Fatalf("NFT identity fields lost: %+v", nft)
 	}
 
@@ -251,7 +253,7 @@ func TestRPCDTOsIgnoreStaleWireFieldNamesWithoutAliasMapping(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"Key":"name","Value":"Crown"}`), &property); err != nil {
 		t.Fatalf("token property decode failed: %v", err)
 	}
-	if property.Key != "" || property.Value != "" {
+	if property.Key != "" || property.Value.Text != "" || !property.Value.IsText() {
 		t.Fatalf("stale metadata fields must not populate current fields: %+v", property)
 	}
 

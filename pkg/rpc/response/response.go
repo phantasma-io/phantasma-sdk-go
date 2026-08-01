@@ -481,24 +481,6 @@ func (s *SignatureResult) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, (*signatureResult)(s))
 }
 
-// EventExResult describes one extended transaction event returned by current RPC nodes.
-type EventExResult struct {
-	Address  string      `json:"address"`
-	Contract string      `json:"contract"`
-	Kind     string      `json:"kind"`
-	Data     interface{} `json:"data"`
-}
-
-func (e *EventExResult) UnmarshalJSON(data []byte) error {
-	data, err := stripExactFields(data, "Kind", "Data")
-	if err != nil {
-		return err
-	}
-
-	type eventExResult EventExResult
-	return json.Unmarshal(data, (*eventExResult)(e))
-}
-
 // TransactionResult describes a transaction returned by RPC.
 type TransactionResult struct {
 	Hash           string            `json:"hash"`
@@ -680,8 +662,11 @@ type TokenSeriesResult struct {
 
 // TokenPropertyResult describes a token metadata key/value pair.
 type TokenPropertyResult struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key string `json:"key"`
+	// Value carries the decoded VM value. Scalars keep their content in Value.Text; VM structs and
+	// arrays keep their shape instead of being packed into a JSON string, which is what this field
+	// used to hold before the 2026-08 node series.
+	Value VMValue `json:"value"`
 }
 
 func (p *TokenPropertyResult) UnmarshalJSON(data []byte) error {
